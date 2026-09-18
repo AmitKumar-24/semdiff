@@ -1,0 +1,47 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "semdiff"
+version = "0.0.0"
+description = "Semantic HTML change detection: two snapshots in, typed change objects out."
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+requires-python = ">=3.11"
+classifiers = [
+    "Development Status :: 1 - Planning",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Text Processing :: Markup :: HTML",
+    "Typing :: Typed",
+]
+dependencies = [
+    "selectolax",
+    "lxml",
+    "extruct",
+    "pydantic>=2",
+]
+
+[project.optional-dependencies]
+content = ["trafilatura"]
+ml = ["sentence-transformers"]
+all = ["semdiff[content,ml]"]
+dev = ["pytest", "mypy"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/semdiff"]
+
+[tool.hatch.build.targets.sdist]
+exclude = ["corpus/", "tests/", ".github/"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.mypy]
+strict = true
+python_version = "3.11"

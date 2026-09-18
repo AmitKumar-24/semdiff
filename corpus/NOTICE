@@ -1,0 +1,13 @@
+SemDiff test corpus — NOTICE
+
+The HTML files under corpus/ are verbatim captures of publicly accessible web pages,
+collected for research and benchmarking of HTML change detection (see corpus/README.md).
+They are NOT covered by the Apache-2.0 license of the SemDiff source code.
+
+Each fixture's pair.json records the page's source URL, capture times, the license
+that applies to the page content, a terms URL, attribution, and the redistribution
+basis ("permissive" or "case-by-case"). Rights in the page content remain with their
+owners; the captures are redistributed under those recorded terms.
+
+Takedown / questions: <TAKEDOWN CONTACT — PLACEHOLDER, TO BE FILLED BY THE MAINTAINER>
+On request from a rights holder, the affected fixture will be removed.
