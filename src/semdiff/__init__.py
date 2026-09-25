@@ -8,6 +8,7 @@ from semdiff.errors import (
     ParseError,
     SemDiffError,
 )
+from semdiff.normalize.api import normalize
 from semdiff.parse import ParsedDoc, parse
 
 __version__ = "0.0.0"
@@ -23,5 +24,6 @@ __all__ = [
     "ParserBackend",
     "SemDiffError",
     "__version__",
+    "normalize",
     "parse",
 ]

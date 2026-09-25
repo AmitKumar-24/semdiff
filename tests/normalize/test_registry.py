@@ -191,7 +191,9 @@ def test_ruleset_fingerprint_tracks_versions_and_feeds_config_hash(monkeypatch: 
     assert ruleset_fingerprint(v1) != ruleset_fingerprint(v2)
     assert ruleset_fingerprint(v1) == ruleset_fingerprint(make_registry(rule("test.x", version=1, pattern="other")))
     before = Config().config_hash
-    monkeypatch.setattr("semdiff.normalize.registry.BUILTIN_RULES", v2)
+    from semdiff.normalize import registry  # module object: `semdiff.normalize` the attribute is the function
+
+    monkeypatch.setattr(registry, "BUILTIN_RULES", v2)
     assert Config().config_hash != before
 
 

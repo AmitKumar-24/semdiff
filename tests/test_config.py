@@ -112,7 +112,9 @@ def test_hash_format() -> None:
 
 def test_ruleset_version_is_part_of_hash(monkeypatch: pytest.MonkeyPatch) -> None:
     before = Config().config_hash
-    monkeypatch.setattr("semdiff.normalize.registry.builtin_ruleset_version", lambda: "test-bump")
+    from semdiff.normalize import registry  # module object: `semdiff.normalize` the attribute is the function
+
+    monkeypatch.setattr(registry, "builtin_ruleset_version", lambda: "test-bump")
     assert Config().config_hash != before
 
 

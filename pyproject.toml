@@ -9,6 +9,7 @@ description = "Semantic HTML change detection: two snapshots in, typed change ob
 readme = "README.md"
 license = "Apache-2.0"
 license-files = ["LICENSE"]
+authors = [{ name = "AmitKumar-24" }]
 requires-python = ">=3.11"
 classifiers = [
     "Development Status :: 1 - Planning",

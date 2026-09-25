@@ -1,5 +1,6 @@
 """L1 — normalization: rule model, phase-ordered registry (T-12) and built-in families (T-13+)."""
 
+from semdiff.normalize.api import normalize
 from semdiff.normalize.model import (
     Action,
     EntropyMatcher,
@@ -30,4 +31,5 @@ __all__ = [
     "RuleRegistry",
     "Target",
     "apply_rules",
+    "normalize",
 ]

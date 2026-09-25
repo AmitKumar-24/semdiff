@@ -148,6 +148,71 @@ def test_input_tree_not_mutated_and_output_deterministic() -> None:
     assert first.tree.html == second.tree.html == '<html><head></head><body><div><a class="b" id="m">t</a></div></body></html>'
 
 
+# ---- F-010: only ASCII whitespace collapses ----------------------------------------------------
+NBSP = " "
+THIN_SPACE = " "
+IDEOGRAPHIC_SPACE = "　"
+NARROW_NBSP = " "
+# Lexbor serializes U+00A0 in element text as the &nbsp; entity and other non-ASCII whitespace
+# literally. Either spelling must survive the whitespace rule: it is content, not layout.
+SERIALIZED = {NBSP: "&nbsp;"}
+
+
+def serialized(char: str) -> str:
+    return SERIALIZED.get(char, char)
+
+
+def test_nbsp_is_content_not_layout() -> None:
+    assert canon(f"<p>a{NBSP}b</p>") != canon("<p>a b</p>")
+    assert canon("<p>a&nbsp;b</p>") != canon("<p>a b</p>")
+    assert canon("<p>a&nbsp;b</p>") == canon(f"<p>a{NBSP}b</p>")  # entity and literal agree
+    assert "a&nbsp;b" in canon(f"<p>a{NBSP}b</p>")
+
+
+@pytest.mark.parametrize(
+    "char",
+    [NBSP, THIN_SPACE, IDEOGRAPHIC_SPACE, NARROW_NBSP],
+    ids=["nbsp", "thin", "ideographic", "narrow"],
+)
+def test_non_ascii_whitespace_is_preserved(char: str) -> None:
+    body = f"<p>x{serialized(char)}y</p>"
+    assert canon(f"<p>x{char}y</p>") == f"<html><head></head><body>{body}</body></html>"
+    pretty = f"<div>\n  <p>x{char}y</p>\n</div>"
+    assert canon(pretty) == f"<html><head></head><body><div>{body}</div></body></html>"
+
+
+def test_non_ascii_whitespace_is_not_a_collapsible_boundary() -> None:
+    # A text node that is only nbsp survives where an all-ASCII-whitespace one is dropped.
+    assert "<div>&nbsp;</div>" in canon(f"<div>{NBSP}</div>")
+    assert canon("<div>\n  \t</div>") == "<html><head></head><body><div></div></body></html>"
+    # ASCII runs around an nbsp still collapse to one space; the nbsp itself stays.
+    assert canon(f"<p>a  \n {NBSP}  b</p>") == "<html><head></head><body><p>a &nbsp; b</p></body></html>"
+
+
+def test_ascii_collapse_and_protections_are_unchanged_by_the_fix() -> None:
+    assert canon("<p>a \t\r\n  b</p>") == canon("<p>a b</p>")
+    assert canon("<div>\n  <p>x</p>\n</div>") == "<html><head></head><body><div><p>x</p></div></body></html>"
+    out = canon(
+        f"<pre>a{NBSP}\n  b</pre><textarea> {NBSP} </textarea>"
+        f"<script>/* {NBSP}  x */</script><style>p {{ {NBSP} }}</style>"
+        f"<template><p>  {NBSP}  </p></template>"
+    )
+    assert "a&nbsp;\n  b" in out and "> &nbsp; <" in out            # pre / textarea: raw, entity-escaped
+    assert f"/* {NBSP}  x */" in out and f"p {{ {NBSP} }}" in out   # script / style: raw, literal
+    assert "<p>  &nbsp;  </p>" in out                               # template: untouched
+
+
+def test_nbsp_document_is_still_idempotent() -> None:
+    messy = f'<div>\n  <!-- c -->\n  <a id="m" class="b">\n    t{NBSP}u\n  </a>\n</div>'
+    once = canon(messy)
+    assert canon(once) == once
+    assert fired(once) == []
+
+
+def test_whitespace_rule_version_records_the_behaviour_change() -> None:
+    assert BY_ID["canonical.whitespace"].version == 2  # D-028: bump when behaviour changes
+
+
 def test_foreign_content_attribute_case_survives_sorting() -> None:
     # Found on mui.com: viewBox is spec-adjusted by the parser; re-inserting via the lowercase key
     # produced "viewbox" on the first pass and "viewBox" on the second — no fixpoint.

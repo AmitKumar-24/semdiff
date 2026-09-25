@@ -35,7 +35,10 @@ BLOCK_TAGS = frozenset(
     "details summary iframe canvas video audio picture source track option optgroup".split()
 )
 PRESERVED_WHITESPACE_TAGS = frozenset({"pre", "textarea"}) | PROTECTED_TEXT_PARENTS
-_WS = re.compile(r"\s+")
+# Only HTML "ASCII whitespace" collapses: tab, LF, FF, CR, space. Deliberately not Python's
+# ``\s``, which is Unicode-aware and would swallow U+00A0 (&nbsp;), U+2009 and friends —
+# those are content, not layout, and a change to one is a real change (F-010).
+_WS = re.compile(r"[\t\n\f\r ]+")
 _ANY = RegexMatcher(r"(?s)^.*$")  # tree transforms do not use the matcher
 
 
@@ -144,7 +147,7 @@ def sort_attributes(rule: NormalizationRule, tree: LexborHTMLParser) -> list[Rul
     return out
 
 
-def _rule(rule_id: str, transform: object) -> NormalizationRule:
+def _rule(rule_id: str, transform: object, version: int = 1) -> NormalizationRule:
     return NormalizationRule(
         id=rule_id,
         family=RuleFamily.CANONICAL,
@@ -152,6 +155,7 @@ def _rule(rule_id: str, transform: object) -> NormalizationRule:
         matcher=_ANY,
         action=Action.CANONICALIZE,
         phase=PHASE_CANONICAL,
+        version=version,
         transform=transform,  # type: ignore[arg-type]
     )
 
@@ -159,5 +163,5 @@ def _rule(rule_id: str, transform: object) -> NormalizationRule:
 CANONICAL_RULES: tuple[NormalizationRule, ...] = (
     _rule("canonical.attr_order", sort_attributes),
     _rule("canonical.comments", strip_comments),
-    _rule("canonical.whitespace", collapse_whitespace),
+    _rule("canonical.whitespace", collapse_whitespace, version=2),  # v2: ASCII-only (F-010)
 )
