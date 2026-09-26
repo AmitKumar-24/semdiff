@@ -18,6 +18,7 @@ Requirements are scoped so the MVP is v0.1 + v0.2 only. Everything that needs a 
 **FR-9.** Neutralize timestamps: ISO-8601 datetimes and relative-date phrasing ("3 minutes ago", "updated yesterday") in matched positions.
 **FR-10.** Expose normalization as a public standalone API (`semdiff.normalize(html) -> html`) independent of diffing. *Justification: immediately useful to changedetection.io and urlwatch users before any semantics ship; earns adoption early.*
 **FR-11.** Every normalization rule is individually toggleable and user-extensible via config, and the set of rules applied is reported in the result.
+**FR-44.** Neutralize build hashes inside URL attributes (`src`, `href`, `srcset`): content-hashed bundle names (`main.3eef80bd.js`, `99013-8b54dcaea3573ec3.js`), framework build-id path segments, and cache-busting query strings on static assets. The hash is removed and the resource path kept, and only when the URL is recognisably a static asset — `youtube.com/watch?v=4anAwXYqLG8` has the same shape as a cache buster and must survive. *Justification: measured on the T-04 captures (F-013), this is the only difference between two snapshots of an unchanged Docusaurus page and the dominant one on Next.js sites; FR-5..FR-9 do not reach it.* (Numbering is append-only; this belongs with FR-5..FR-9.)
 
 ### Noise filtering (minimal in MVP)
 **FR-12.** Remove `<script>`, `<style>`, `<noscript>`, `<iframe>`, and tracking pixels before diffing.

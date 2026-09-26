@@ -1,0 +1,17 @@
+{
+  "label_version": "1",
+  "category": "noise_only",
+  "url": "https://docusaurus.io/docs",
+  "captured_old": "2026-09-17T07:15:09Z",
+  "captured_new": "2026-09-25T16:49:42Z",
+  "content_type": "text/html; charset=UTF-8",
+  "expected": {
+    "change_types": []
+  },
+  "noise_families": ["asset_hash"],
+  "notes": "Manual review per D-021, done independently of SemDiff's rules (visible text, tag/attribute skeleton, attribute values): the two snapshots differ in exactly two places, the content hashes in <script src=\"/assets/js/runtime~main.*.js\"> and <script src=\"/assets/js/main.*.js\">. Every other byte of the document is identical, including all 323 visible text nodes, all 616 elements and all 285 class values. The site redeployed between captures; no content changed.",
+  "license": "MIT",
+  "terms_url": "https://github.com/facebook/docusaurus/blob/main/LICENSE",
+  "attribution": "Meta Platforms, Inc.",
+  "basis": "permissive"
+}

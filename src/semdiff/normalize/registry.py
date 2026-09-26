@@ -149,6 +149,15 @@ def _apply_attributes(rule: NormalizationRule, node: LexborNode) -> list[RuleApp
             locator = Locator.for_node(node)
             del node.attrs[name]
             out.append(RuleApplication(rule.id, locator, before, ""))
+        elif rule.target is Target.ATTRIBUTE_SUBSTRING:  # rewrite in place; the attribute stays
+            if not rule.matcher.matches(before):
+                continue
+            after = rule.matcher.sub(before, "")
+            if after == before:
+                continue
+            locator = Locator.for_node(node)
+            node.attrs[name] = after
+            out.append(RuleApplication(rule.id, locator, before, after))
         else:  # ATTRIBUTE_VALUE: strip matching whitespace-separated tokens
             kept = [t for t in before.split() if not rule.matcher.matches(t)]
             after = " ".join(kept)

@@ -22,12 +22,13 @@ class Category(StrEnum):
 
 
 class NoiseFamily(StrEnum):
-    """The four differences a noise_only pair may contain (D-021)."""
+    """The differences a noise_only pair may contain (D-021, extended by D-036)."""
 
     DYNAMIC_CLASS = "dynamic_class"
     HASHED_ID = "hashed_id"
     TOKEN = "token"
     TIMESTAMP = "timestamp"
+    ASSET_HASH = "asset_hash"
 
 
 class Basis(StrEnum):

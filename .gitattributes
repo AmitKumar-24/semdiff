@@ -1,0 +1,4 @@
+# Corpus fixtures are verbatim HTTP captures (D-012): the stored bytes must be exactly
+# what the server sent. Git must never translate their line endings on checkout, or a
+# clone on Windows would rewrite the fixtures and the pair would stop being the capture.
+corpus/** -text

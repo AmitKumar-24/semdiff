@@ -4,6 +4,7 @@ from semdiff.normalize.api import normalize
 from semdiff.normalize.model import (
     Action,
     EntropyMatcher,
+    GroupMatcher,
     Matcher,
     NodePredicate,
     NormalizationRule,
@@ -21,6 +22,7 @@ __all__ = [
     "BUILTIN_RULES",
     "Action",
     "EntropyMatcher",
+    "GroupMatcher",
     "Matcher",
     "NodePredicate",
     "NormalizationRule",

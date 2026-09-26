@@ -54,6 +54,7 @@ This rule is deliberately not defined in terms of SemDiff's own normalization ru
 
 Pages are captured by an external script (never by the library): raw HTTP GET, fixed
 User-Agent, no cookies or authentication, redirects followed, `robots.txt` respected,
-response bytes stored verbatim. Sources are permissively licensed by default; any
+response bytes stored verbatim. The repository's `.gitattributes` marks `corpus/**` as
+binary so Git never translates a fixture's line endings on checkout. Sources are permissively licensed by default; any
 case-by-case source is recorded as such in its label. A corpus `NOTICE` with the
 takedown contact is added with the first fixtures.

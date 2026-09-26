@@ -147,6 +147,37 @@ def test_attribute_strip_and_node_drop_and_text_strip() -> None:
     assert ids == ["test.id.hash", "test.node.aside", "test.text.relative"]  # phase order 20, 30, 40
 
 
+def test_attribute_substring_rewrites_in_place_and_keeps_the_attribute() -> None:
+    # T-23 added ATTRIBUTE_SUBSTRING: unlike ATTRIBUTE and ATTRIBUTE_VALUE it must not
+    # remove the attribute — only the matched span goes.
+    from semdiff.normalize.model import GroupMatcher
+
+    substring = NormalizationRule(
+        id="test.substring",
+        family=RuleFamily.ASSET_HASH,
+        target=Target.ATTRIBUTE_SUBSTRING,
+        matcher=GroupMatcher(r"(?P<hash>-[0-9a-f]{6})(?=\.js$)"),
+        action=Action.STRIP,
+        phase=50,
+        attributes=frozenset({"src"}),
+    )
+    doc = parse(b'<script src="/a/b-1a2b3c.js" data-src="/a/b-1a2b3c.js"></script>')
+    result = apply_rules(doc, make_registry(substring), NormalizationConfig())
+    script = result.tree.css_first("script")
+    assert script.attributes["src"] == "/a/b.js"
+    assert script.attributes["data-src"] == "/a/b-1a2b3c.js"  # outside the rule's scope
+    assert [(a.rule_id, a.before, a.after) for a in result.applied_rules] == [
+        ("test.substring", "/a/b-1a2b3c.js", "/a/b.js")
+    ]
+
+
+def test_group_matcher_requires_a_hash_group() -> None:
+    from semdiff.normalize.model import GroupMatcher
+
+    with pytest.raises(ValueError, match="hash"):
+        GroupMatcher(r"-[0-9a-f]{6}")
+
+
 def test_structured_data_carriers_are_protected() -> None:
     doc = parse(HTML)
     protective = rule("test.any.attr", target=Target.ATTRIBUTE, pattern=r"^css-notouch$", attributes=frozenset())

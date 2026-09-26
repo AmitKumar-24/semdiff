@@ -51,10 +51,11 @@ The smallest useful release. No diffing at all.
 | T-15 | Rule family: tokens (nonce, CSRF, session-shaped hidden inputs) | T-12 | Token stripped, surrounding structure intact |
 | T-16 | Rule family: timestamps (ISO-8601 + relative-date phrasing) | T-12 | "3 minutes ago" and ISO both neutralized |
 | T-17 | Rule family: canonicalization (whitespace, attr order, self-closing, comments) — **phase last** | T-12 | Reformat-only input → zero rule-detectable difference |
+| T-23 | Rule family: asset hashes in `src`/`href`/`srcset` (bundle hashes, build-id path segments, cache-buster queries) | T-12 | Two deploys of an unchanged page converge; `watch?v=` and other meaningful URLs survive |
 | T-18 | `REPLACE_WITH_PLACEHOLDER` action distinct from `STRIP` | T-12 | Attribute presence preserved where it's structurally meaningful |
 | T-19 | Public `semdiff.normalize(html, config) -> str` | T-13..18 | Idempotent: `normalize(normalize(x)) == normalize(x)` |
 | T-20 | CLI `semdiff normalize file.html` | T-19 | Round-trips a file, `--report` lists fired rules |
-| T-21 | **Gate:** noise-only corpus → normalized outputs byte-identical | T-19, T-04 | All 20 pairs identical after normalization |
+| T-21 | **Gate:** noise-only corpus → normalized outputs byte-identical | T-19, T-23, T-04 | All 20 pairs identical after normalization |
 | T-22 | Baseline comparison: same 20 pairs through `lxml.html.diff` and `difflib` | T-21 | Published table of their change counts vs zero |
 
 **Release v0.1.** T-22 is the marketing asset, not an afterthought — "here are 20 real page pairs where the standard tools report hundreds of changes and this reports none" is the entire pitch. Post it where changedetection.io and urlwatch users are.

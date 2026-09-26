@@ -21,11 +21,13 @@ class RuleFamily(StrEnum):
     TOKEN = "token"
     CANONICAL = "canonical"
     TIMESTAMP = "timestamp"
+    ASSET_HASH = "asset_hash"
 
 
 class Target(StrEnum):
     ATTRIBUTE_VALUE = "attribute_value"  # whitespace-separated tokens of an attribute
     ATTRIBUTE = "attribute"  # the whole attribute
+    ATTRIBUTE_SUBSTRING = "attribute_substring"  # a span inside the value; the rest survives
     NODE = "node"  # an element, matched by tag name
     TEXT = "text"  # a text node
 
@@ -59,6 +61,36 @@ class RegexMatcher:
 
     def sub(self, value: str, replacement: str) -> str:
         return self._compiled.sub(replacement, value)
+
+
+@dataclass(frozen=True)
+class GroupMatcher:
+    """Matches a hash that is only recognisable from its surroundings (T-23, FR-44).
+
+    ``/assets/js/main.3eef80bd.js`` is a build hash and ``?v=4anAwXYqLG8`` on a YouTube
+    watch URL is not, and the two are the same shape — only the context separates them.
+    So the pattern carries that context, and ``sub`` replaces the ``hash`` group alone,
+    leaving the rest of the value in place.
+    """
+
+    pattern: str
+    _compiled: re.Pattern[str] = field(init=False, repr=False, compare=False)
+
+    def __post_init__(self) -> None:
+        compiled = re.compile(self.pattern)
+        if "hash" not in compiled.groupindex:
+            raise ValueError(f"pattern {self.pattern!r} has no (?P<hash>...) group")
+        object.__setattr__(self, "_compiled", compiled)
+
+    def matches(self, value: str) -> bool:
+        return self._compiled.search(value) is not None
+
+    def sub(self, value: str, replacement: str) -> str:
+        def swap(match: re.Match[str]) -> str:
+            start, end = match.span("hash")
+            return value[match.start() : start] + replacement + value[end : match.end()]
+
+        return self._compiled.sub(swap, value)
 
 
 _ALNUM_RUN = re.compile(r"[A-Za-z0-9]+")
