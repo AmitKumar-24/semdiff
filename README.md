@@ -57,6 +57,33 @@ config = Config(normalization=NormalizationConfig(disabled_rules=frozenset({"tim
 semdiff.normalize(html, config)
 ```
 
+### Command line
+
+```
+semdiff normalize page.html                  # normalized HTML on stdout
+cat page.html | semdiff normalize            # or from stdin
+semdiff normalize page.html -o clean.html    # or straight to a file
+semdiff normalize page.html --report         # which rules fired, on stderr
+semdiff normalize page.html --disable-rule timestamp.relative_ago --disable-rule class.emotion
+semdiff normalize page.html --config semdiff.json
+```
+
+`--report` writes to stderr, so stdout stays byte-identical with or without it:
+
+```
+$ semdiff normalize page.html --report > clean.html
+6 rules fired, 10 applications
+  class.emotion           1
+  id.hex_suffix           1
+  timestamp.relative_ago  1
+  asset.dotted_hash       1
+  canonical.comments      1
+  canonical.whitespace    5
+```
+
+Exit codes: `0` success, `2` bad command line, `3` parse error, `4` input too large,
+`5` configuration error, `6` I/O error, `1` anything else.
+
 ### Guarantees
 
 - **Deterministic.** Same input and config, same output — no clock, no network, no randomness.
