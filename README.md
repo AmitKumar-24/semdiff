@@ -42,7 +42,7 @@ that does not exist.
 | Dynamic classes | Emotion `css-1dbjc4n`, styled-components `sc-bdfBwQ`, CSS Modules `toggle_bT41`, Ant Design `acss-q7dsfq` |
 | Hashed ids | `react-root-7a3b2c`, React `useId` (`:R2m:`), high-entropy generated ids |
 | Tokens | `nonce` attributes, CSRF meta tags and hidden inputs, session-shaped attribute values |
-| Timestamps | ISO-8601 datetimes, "3 minutes ago", "just now", "updated yesterday" |
+| Timestamps | ISO-8601 datetimes, "3 minutes ago", "just now", "updated yesterday", build stamps like `Sep 25, 2026 (15:12 UTC)` |
 | Canonicalization | comments, ASCII-whitespace collapse, attribute order, void/boolean-attribute spelling |
 
 Microdata, RDFa and JSON-LD carriers are protected: no rule touches `itemprop`, `itemtype`,

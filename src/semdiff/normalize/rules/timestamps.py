@@ -16,6 +16,15 @@ _QUANTITY = r"(?:\d{1,4}|an?|one|two|three|four|five|six|seven|eight|nine|ten|a 
 _UNIT = r"(?:seconds?|secs?|minutes?|mins?|hours?|hrs?|days?|weeks?|months?|years?|yrs?)"
 _UPDATE_VERB = r"(?:last\s+)?(?:updated|modified|edited|posted|published|refreshed|generated|checked|synced|seen)"
 _RELATIVE_DAY = r"(?:yesterday|today|tonight|this\s+(?:morning|afternoon|evening|week|month))"
+# F-008: "Sep 25, 2026 (15:12 UTC)" — Sphinx's "last updated" footer and its relatives.
+# The parenthesised clock time and the zone are both mandatory: they are what separates a
+# build stamp from a prose date, which is content ("September 3, 2026", "Released Jan 2026").
+_MONTH = (
+    r"(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?"
+    r"|Aug(?:ust)?|Sep(?:t|tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\.?"
+)
+_ZONE = r"(?:UTC|GMT|Z|[+-]\d{2}:?\d{2})"
+_CLOCK = rf"\(\d{{1,2}}:\d{{2}}(?::\d{{2}})?\s+{_ZONE}\)"
 
 
 def _rule(rule_id: str, pattern: str) -> NormalizationRule:
@@ -34,6 +43,8 @@ TIMESTAMP_RULES: tuple[NormalizationRule, ...] = (
     _rule("timestamp.iso8601", r"\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?"),
     # "3 minutes ago", "an hour ago", "a few seconds ago"
     _rule("timestamp.relative_ago", rf"(?i)\b{_QUANTITY}\s+{_UNIT}\s+ago\b"),
+    # "Sep 25, 2026 (15:12 UTC)" / "September 3, 2026 (09:05 UTC)" (F-008)
+    _rule("timestamp.human_datetime", rf"\b{_MONTH}\s+\d{{1,2}},?\s+\d{{4}}\s+{_CLOCK}"),
     # "just now", "moments ago", "updated yesterday", "last checked this morning"
     _rule("timestamp.relative_phrase", rf"(?i)\b(?:just now|moments ago|a moment ago|{_UPDATE_VERB}\s+{_RELATIVE_DAY})\b"),
 )

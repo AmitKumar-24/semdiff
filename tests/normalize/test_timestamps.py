@@ -37,6 +37,13 @@ POSITIVE = [
     ("a few seconds ago", "timestamp.relative_ago", ""),
     ("10 years ago", "timestamp.relative_ago", ""),
     ("Edited 5 mins ago.", "timestamp.relative_ago", "Edited ."),
+    # F-008: human-readable date + parenthesised clock time + zone (Sphinx "last updated")
+    ("Last updated on Sep 25, 2026 (15:12 UTC).", "timestamp.human_datetime", "Last updated on ."),
+    ("Last updated on Sep 26, 2026 (16:22 UTC).", "timestamp.human_datetime", "Last updated on ."),
+    ("Built September 3, 2026 (09:05 UTC)", "timestamp.human_datetime", "Built "),
+    ("Sep. 3, 2026 (9:05:31 GMT)", "timestamp.human_datetime", ""),
+    ("Jan 1 2026 (00:00 +05:30)", "timestamp.human_datetime", ""),
+    ("as of Dec 31, 2026 (23:59:59 Z) exactly", "timestamp.human_datetime", "as of  exactly"),
     ("just now", "timestamp.relative_phrase", ""),
     ("Saved moments ago", "timestamp.relative_phrase", "Saved "),
     ("Updated yesterday", "timestamp.relative_phrase", ""),
@@ -67,6 +74,19 @@ NEGATIVE = [
     "2 days",
     "2026-09-17T",  # truncated ISO, no time
     "Updated on 2026-09-17",
+    # F-008 negatives: a human-readable date is content unless a clock time rides with it
+    "Last updated on Sep 25, 2026.",
+    "September 3, 2026",
+    "Sep 3, 2026 (draft)",
+    "Sep 3, 2026 (v2.1)",
+    "Released Jan 2026",
+    "Copyright 2001 Python Software Foundation.",
+    '"year": 1971',
+    "Sep 3 (15:12 UTC)",  # no year
+    "Sep 3, 2026 (15:12)",  # no zone: could be an opening hour
+    "Sep 3, 2026 15:12 UTC",  # unparenthesised: out of the documented family
+    "Septet 3, 2026 (15:12 UTC)",  # not a month
+    "PEP 3, 2026 (15:12 UTC)",
 ]
 
 
@@ -113,7 +133,12 @@ def test_script_style_template_content_is_protected() -> None:
 
 def test_family_is_registered_with_stable_ids_and_phase() -> None:
     ids = [rule.id for rule in BUILTIN_RULES.ordered() if rule.family is RuleFamily.TIMESTAMP]
-    assert ids == sorted(BY_ID) == ["timestamp.iso8601", "timestamp.relative_ago", "timestamp.relative_phrase"]
+    assert ids == sorted(BY_ID) == [
+        "timestamp.human_datetime",
+        "timestamp.iso8601",
+        "timestamp.relative_ago",
+        "timestamp.relative_phrase",
+    ]
     assert {rule.phase for rule in TIMESTAMP_RULES} == {40}
     assert all(rule.target is Target.TEXT for rule in TIMESTAMP_RULES)
 
