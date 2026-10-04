@@ -1,0 +1,19 @@
+{
+  "label_version": "1",
+  "category": "noise_only",
+  "url": "https://docs.python.org/3/library/cmath.html",
+  "captured_old": "2026-10-01T16:57:12Z",
+  "captured_new": "2026-10-03T16:17:59Z",
+  "content_type": "text/html",
+  "expected": {
+    "change_types": []
+  },
+  "noise_families": [
+    "timestamp"
+  ],
+  "notes": "Manual review per D-021, done independently of SemDiff's rules (visible text, tag sequence, attribute names, attribute values, and a raw byte-region diff that also covers script bodies, comments and whitespace): the two snapshots differ in exactly one place, the footer 'Last updated on Oct 01, 2026 (10:41 UTC).' becoming 'Last updated on Oct 03, 2026 (15:47 UTC).'. All 1336 elements, all attribute names, all 1288 attribute values and 798 of the 798 visible text nodes are identical; the ?v= stylesheet cache busters did not move in this window. The page is rebuilt daily. Captured in T-21 round 3 under the six-per-host cap.",
+  "license": "PSF-2.0",
+  "terms_url": "https://docs.python.org/3/license.html",
+  "attribution": "Python Software Foundation",
+  "basis": "permissive"
+}

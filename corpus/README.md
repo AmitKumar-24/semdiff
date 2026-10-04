@@ -31,7 +31,7 @@ sequence, e.g. `mui-com-001`. Ids are stable once created and unique across the 
 | `captured_new` | ISO-8601 datetime, timezone required | |
 | `content_type` | string | The `Content-Type` response header |
 | `expected.change_types` | list of strings | Change types the engine must emit; `[]` for `noise_only` |
-| `noise_families` | list, optional | Which allowed noise families the reviewer observed: `dynamic_class`, `hashed_id`, `token`, `timestamp` |
+| `noise_families` | list, optional | Which allowed noise families the reviewer observed: `dynamic_class`, `hashed_id`, `token`, `timestamp`, `asset_hash` (D-036) |
 | `notes` | string, optional | Reviewer notes |
 | `license` | string | SPDX id of the page content, or `proprietary` |
 | `terms_url` | http(s) URL | Where the page's terms/license are stated |
@@ -49,6 +49,27 @@ structure are unchanged. Any other meaningful text, element, attribute, or struc
 change disqualifies the pair.
 
 This rule is deliberately not defined in terms of SemDiff's own normalization rules.
+
+## Admission limits and recorded rejections
+
+At most **six fixtures per host**, so that no single site or page generator can dominate the
+accuracy gate. A candidate that passes the independent review but exceeds the cap is rejected
+as surplus, and the reason is recorded here rather than left implicit.
+
+A pair is also rejected, however clean the review, when admitting it would put sensitive or
+credential-shaped material into the repository.
+
+| Candidate | Round | Verdict | Reason |
+|---|---|---|---|
+| `docs.python.org/3/library/bisect.html` | 3 | Rejected, surplus | Qualified as a `timestamp` pair, but docs.python.org was at the six-per-host cap. Of the six qualifying Python pairs it is the closest shape-twin of `heapq` (1173 vs 1200 elements, 49.9 vs 59.6 KB), so dropping it costs the least independence; the five admitted pairs span 387 to 1780 elements. |
+| `tauri.app/start/` | 3 | Rejected, sensitive material | The only difference was a rotating `data-netlify-cwv-token` JWT, which embeds Netlify site, account and deploy ids. Admitting the pair would commit a signed token to the repository and would trip secret scanners. The pair is otherwise clean, and the token family is in any case outside the families accepted during T-21 collection. |
+
+`pnpm-io-001` is admitted deliberately as a **known-red** fixture: the review found a single
+Vite base64url asset hash, which FR-44's hex-only pattern does not match, so SemDiff does not
+yet normalize the pair to equality. It is the regression target for a later FR-44 extension,
+on the same pattern as `docs-python-org-001` before D-041. No rule was changed to accommodate
+it, and no fixture is ever edited to make code pass.
+
 
 ## Capture and licensing
 

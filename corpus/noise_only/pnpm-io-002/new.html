@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+  <head><!-- first-paint --><script>(function(){var t;try{t=localStorage.getItem("theme")}catch(e){}if(t!=='light'&&t!=='dark')t=window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';document.documentElement.setAttribute('data-theme',t)})()</script><link rel="preconnect" href="https://fonts.googleapis.com" /><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin /><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" /><style>body{font-family:var(--typography-font-family,system-ui,sans-serif);background:var(--colors-surface-background,#fff);color:var(--colors-text-primary,#212121);margin:0}.docs-prerendered{box-sizing:border-box;overflow-wrap:break-word;max-width:860px;margin:0 auto;padding:88px 24px 48px;line-height:1.6}.docs-prerendered h1{margin:0 0 24px;font-size:36px;line-height:1.2}.docs-prerendered h2{margin:48px 0 16px;font-size:30px;line-height:1.2}.docs-prerendered h3{margin:32px 0 12px;font-size:24px;line-height:1.2}.docs-prerendered a{color:var(--colors-text-link,#f69220)}.docs-prerendered .hash-link{display:none}.docs-prerendered img{max-width:100%;height:auto}.docs-prerendered pre{background:var(--colors-surface-tertiary,#f8f9fa);border-radius:8px;padding:16px;overflow-x:auto}.docs-prerendered code{font-size:.9em}.docs-prerendered table{border-collapse:collapse;display:block;overflow-x:auto}.docs-prerendered th,.docs-prerendered td{border:1px solid var(--colors-border-default,#e0e0e0);padding:8px 12px}.docs-prerendered article+article{margin-top:48px}</style>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Motivation | pnpm</title>
+    <meta name="description" content="When using npm, if you have 100 projects using a dependency, you will have 100 copies of that dependency saved on disk. With pnpm, the dependency will be stored in a content-addressable store, so:" />
+    <meta name="theme-color" content="#f69220" />
+    <link rel="icon" href="/img/favicon.png" />
+    <link rel="alternate" type="application/rss+xml" title="pnpm Blog RSS Feed" href="/blog/rss.xml" />
+    <link rel="alternate" type="application/atom+xml" title="pnpm Blog Atom Feed" href="/blog/atom.xml" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="pnpm" />
+    <meta property="og:title" content="Motivation | pnpm" />
+    <meta property="og:description" content="When using npm, if you have 100 projects using a dependency, you will have 100 copies of that dependency saved on disk. With pnpm, the dependency will be stored in a content-addressable store, so:" />
+    <meta property="og:image" content="https://pnpm.io/img/ogimage.png" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:site" content="@pnpmjs" />
+    <meta name="twitter:title" content="Motivation | pnpm" />
+    <meta name="twitter:description" content="When using npm, if you have 100 projects using a dependency, you will have 100 copies of that dependency saved on disk. With pnpm, the dependency will be stored in a content-addressable store, so:" />
+    <meta name="twitter:image" content="https://pnpm.io/img/ogimage.png" />
+
+    <script type="module" crossorigin src="/assets/index-67LBnYfl.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-gKrm_uHA.css">
+  <link rel="canonical" href="https://pnpm.io/motivation" />
+    <meta property="og:url" content="https://pnpm.io/motivation" />
+    <link rel="alternate" hreflang="en" href="https://pnpm.io/motivation" />
+    <link rel="alternate" hreflang="it" href="https://pnpm.io/it/motivation" />
+    <link rel="alternate" hreflang="zh" href="https://pnpm.io/zh/motivation" />
+    <link rel="alternate" hreflang="ja" href="https://pnpm.io/ja/motivation" />
+    <link rel="alternate" hreflang="ko" href="https://pnpm.io/ko/motivation" />
+    <link rel="alternate" hreflang="pt" href="https://pnpm.io/pt/motivation" />
+    <link rel="alternate" hreflang="zh-TW" href="https://pnpm.io/zh-TW/motivation" />
+    <link rel="alternate" hreflang="ru" href="https://pnpm.io/ru/motivation" />
+    <link rel="alternate" hreflang="uk" href="https://pnpm.io/uk/motivation" />
+    <link rel="alternate" hreflang="fr" href="https://pnpm.io/fr/motivation" />
+    <link rel="alternate" hreflang="tr" href="https://pnpm.io/tr/motivation" />
+    <link rel="alternate" hreflang="es" href="https://pnpm.io/es/motivation" />
+    <link rel="alternate" hreflang="id" href="https://pnpm.io/id/motivation" />
+    <link rel="alternate" hreflang="x-default" href="https://pnpm.io/motivation" />
+    <meta name="docsearch:language" content="en" />
+    <meta name="docsearch:version" content="12.x" />
+    <meta name="docsearch:docusaurus_tag" content="docs-default-12.x" />
+  </head>
+  <body>
+    <div id="root"><main class="docs-prerendered"><article><h1>Motivation</h1><h2 id="saving-disk-space">Saving disk space<a class="hash-link" href="#saving-disk-space" aria-label="Direct link to Saving disk space">#</a></h2>
+<p><img src="/docs-assets/12.x/img/pnpm-store.svg" alt="An illustration of the pnpm content-addressable store. On the illustration there are two projects with node_modules. The files in the node_modules directories are hard links to the same files in the content-addressable store."></p>
+<p>When using npm, if you have 100 projects using a dependency, you will
+have 100 copies of that dependency saved on disk. With pnpm, the dependency will be
+stored in a content-addressable store, so:</p>
+<ol>
+<li>If you depend on different versions of the dependency, only the files that
+differ are added to the store. For instance, if it has 100 files, and a new
+version has a change in only one of those files, <code>pnpm update</code> will only add 1
+new file to the store, instead of cloning the entire dependency just for the
+singular change.</li>
+<li>All the files are saved in a single place on the disk. When packages are
+installed, their files are hard-linked from that single place, consuming no
+additional disk space. This allows you to share dependencies of the same version
+across projects.</li>
+</ol>
+<p>As a result, you save a lot of space on your disk proportional to the number of
+projects and dependencies, and you have a lot faster installations!</p>
+<h2 id="boosting-installation-speed">Boosting installation speed<a class="hash-link" href="#boosting-installation-speed" aria-label="Direct link to Boosting installation speed">#</a></h2>
+<p>pnpm performs installation in three stages:</p>
+<ol>
+<li>Dependency resolution. All required dependencies are identified and fetched to the store.</li>
+<li>Directory structure calculation. The <code>node_modules</code> directory structure is calculated based on the dependencies.</li>
+<li>Linking dependencies. All remaining dependencies are fetched and hard linked from the store to <code>node_modules</code>.</li>
+</ol>
+<p><img src="/docs-assets/12.x/img/installation-stages-of-pnpm.svg" alt="An illustration of the pnpm install process. Packages are resolved, fetched, and hard linked as soon as possible."></p>
+<p>This approach is significantly faster than the traditional three-stage installation process of resolving, fetching, and writing all dependencies to <code>node_modules</code>.</p>
+<p><img src="/docs-assets/12.x/img/installation-stages-of-other-pms.svg" alt="An illustration of how package managers like Yarn Classic or npm install dependencies."></p>
+<h2 id="creating-a-non-flat-node_modules-directory">Creating a non-flat node_modules directory<a class="hash-link" href="#creating-a-non-flat-node_modules-directory" aria-label="Direct link to Creating a non-flat node_modules directory">#</a></h2>
+<p>When installing dependencies with npm or Yarn Classic, all packages are hoisted to the root of the
+modules directory. As a result, source code has access to dependencies that are
+not added as dependencies to the project.</p>
+<p>By default, pnpm uses symlinks to add only the direct dependencies of the project into the root of the modules directory.</p>
+<p><img src="/docs-assets/12.x/img/isolated-node-modules.svg" alt="An illustration of a node_modules directory created by pnpm. Packages in the root node_modules are symlinks to directories inside the node_modules/.pnpm directory"></p>
+<p>If you'd like more details about the unique <code>node_modules</code> structure that pnpm
+creates and why it works fine with the Node.js ecosystem, read:</p>
+<ul>
+<li><a href="/blog/2020/05/27/flat-node-modules-is-not-the-only-way">Flat node_modules is not the only way</a></li>
+<li><a href="/symlinked-node-modules-structure">Symlinked node_modules structure</a></li>
+</ul>
+<div class="admonition admonition-tip"><p class="admonition-title">Tip</p>
+<p>If your tooling doesn't work well with symlinks, you may still use pnpm and set the <a href="/settings/node-modules#nodelinker">nodeLinker</a> setting to <code>hoisted</code>. This will instruct pnpm to create a node_modules directory that is similar to those created by npm and Yarn Classic.</p>
+</div></article></main></div>
+  </body>
+</html>

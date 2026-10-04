@@ -1,0 +1,19 @@
+{
+  "label_version": "1",
+  "category": "noise_only",
+  "url": "https://reactnative.dev/docs/text",
+  "captured_old": "2026-10-03T16:18:48Z",
+  "captured_new": "2026-10-04T16:20:46Z",
+  "content_type": "text/html; charset=UTF-8",
+  "expected": {
+    "change_types": []
+  },
+  "noise_families": [
+    "asset_hash"
+  ],
+  "notes": "Manual review per D-021, done independently of SemDiff's rules (visible text, tag sequence, attribute names, attribute values, and a raw byte-region diff that also covers script bodies, comments and whitespace): the two snapshots differ in exactly one place, the build hash in <script src=\"/assets/js/runtime~main.84c95ae1.js\"> becoming runtime~main.2e69334d.js. All 2149 elements, all attribute names, all 1069 visible text nodes and 2405 of 2406 attribute values are identical; the site redeployed between captures and no content changed. Captured in T-21 round 4, a true 24-hour window (24 h 2 min). Licensing recorded from the project's documentation source repository, which the captured page itself names in its \"edit this page\" link (github.com/facebook/react-native-website); the LICENSE file was not fetched, being outside the D-022 approved URL set for this round.",
+  "license": "CC-BY-4.0",
+  "terms_url": "https://github.com/facebook/react-native-website/blob/main/LICENSE-docs",
+  "attribution": "Meta Platforms, Inc.",
+  "basis": "permissive"
+}
