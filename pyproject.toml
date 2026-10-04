@@ -22,7 +22,10 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = [
-    "selectolax",
+    # Pinned below 1.0: that release changes attribute handling on foreign-content elements,
+    # so canonical.attr_order stops sorting an <svg>'s attributes (F-027). Adapting the engine
+    # is its own task; the corpus gate needs a deterministic parser until then.
+    "selectolax<1.0",
     "lxml",
     "extruct",
     "pydantic>=2",
