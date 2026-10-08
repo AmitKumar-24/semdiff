@@ -1,0 +1,19 @@
+{
+  "label_version": "1",
+  "category": "noise_only",
+  "url": "https://docusaurus.io/docs/installation",
+  "captured_old": "2026-10-04T16:20:16Z",
+  "captured_new": "2026-10-07T04:56:51Z",
+  "content_type": "text/html; charset=UTF-8",
+  "expected": {
+    "change_types": []
+  },
+  "noise_families": [
+    "asset_hash"
+  ],
+  "notes": "Manual review per D-021, done independently of SemDiff's rules (visible text, tag sequence, attribute names, attribute values, and a raw byte-region diff that also covers script bodies, comments and whitespace): the two snapshots differ in exactly 2 places, the build hashes in <script src=\"/assets/js/runtime~main.1df20fbf.js\"> -> runtime~main.d14ed37f.js and <script src=\"/assets/js/main.0454ccc9.js\"> -> main.1c2b3bbb.js. All 955 elements, all attribute names, all 378 visible text nodes and 1572 of 1574 attribute values are identical; the site redeployed between captures and no content changed. Captured in T-21 round 5 over a 2 d 12 h window. Licensing recorded from the project's documentation source repository, which the captured page itself names in its \"edit this page\" link (github.com/facebook/docusaurus); the LICENSE file was not fetched, being outside the D-022 approved URL set for this round.",
+  "license": "MIT",
+  "terms_url": "https://github.com/facebook/docusaurus/blob/main/LICENSE",
+  "attribution": "Meta Platforms, Inc.",
+  "basis": "permissive"
+}

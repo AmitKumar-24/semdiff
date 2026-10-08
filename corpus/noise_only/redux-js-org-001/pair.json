@@ -1,0 +1,19 @@
+{
+  "label_version": "1",
+  "category": "noise_only",
+  "url": "https://redux.js.org/introduction/getting-started",
+  "captured_old": "2026-10-04T16:20:50Z",
+  "captured_new": "2026-10-07T04:57:25Z",
+  "content_type": "text/html; charset=UTF-8",
+  "expected": {
+    "change_types": []
+  },
+  "noise_families": [
+    "asset_hash"
+  ],
+  "notes": "Manual review per D-021, done independently of SemDiff's rules (visible text, tag sequence, attribute names, attribute values, and a raw byte-region diff that also covers script bodies, comments and whitespace): the two snapshots differ in exactly 1 place, the build hash in <script src=\"/assets/js/runtime~main.b96c0ea1.js\"> becoming runtime~main.bfe8927f.js. All 1064 elements, all attribute names, all 496 visible text nodes and 1603 of 1604 attribute values are identical; the site redeployed between captures and no content changed. Captured in T-21 round 5 over a 2 d 12 h window. Licensing recorded from the project's documentation source repository, which the captured page itself names in its \"edit this page\" link (github.com/reduxjs/redux); the LICENSE file was not fetched, being outside the D-022 approved URL set for this round.",
+  "license": "MIT",
+  "terms_url": "https://github.com/reduxjs/redux/blob/master/LICENSE.md",
+  "attribution": "Dan Abramov and the Redux documentation authors",
+  "basis": "permissive"
+}

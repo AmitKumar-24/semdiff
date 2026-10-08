@@ -1,0 +1,19 @@
+{
+  "label_version": "1",
+  "category": "noise_only",
+  "url": "https://babeljs.io/docs/",
+  "captured_old": "2026-10-04T16:20:59Z",
+  "captured_new": "2026-10-07T04:57:35Z",
+  "content_type": "text/html; charset=UTF-8",
+  "expected": {
+    "change_types": []
+  },
+  "noise_families": [
+    "asset_hash"
+  ],
+  "notes": "Manual review per D-021, done independently of SemDiff's rules (visible text, tag sequence, attribute names, attribute values, and a raw byte-region diff that also covers script bodies, comments and whitespace): the two snapshots differ in exactly 2 places, the build hashes in <script src=\"/assets/js/runtime~main.cc44de3c.js\"> -> runtime~main.4ed5c8b5.js and <script src=\"/assets/js/main.57d88fbc.js\"> -> main.1389bbc7.js. All 919 elements, all attribute names, all 393 visible text nodes and 1449 of 1451 attribute values are identical; the site redeployed between captures and no content changed. Captured in T-21 round 5 over a 2 d 12 h window. Licensing recorded from the project's documentation source repository, which the captured page itself names in its \"edit this page\" link (github.com/babel/website); the LICENSE file was not fetched, being outside the D-022 approved URL set for this round.",
+  "license": "MIT",
+  "terms_url": "https://github.com/babel/website/blob/main/LICENSE",
+  "attribution": "The Babel project",
+  "basis": "permissive"
+}
