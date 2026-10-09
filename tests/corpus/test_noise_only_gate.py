@@ -20,11 +20,12 @@ from tests.corpus.assertions import assert_normalized_identical
 from tests.corpus.labels import Category
 from tests.corpus.loader import Pair, load_pairs
 
-# FR-44 matches lowercase-hex content hashes; Vite emits base64url ones
-# (``/assets/index-CxL6fshY.js``), so pnpm.io's single asset-hash change survives
-# normalization. Recorded in corpus/README.md and in each pair.json.
-KNOWN_RED = frozenset({"pnpm-io-001", "pnpm-io-002"})
-KNOWN_RED_REASON = "FR-44 does not match Vite base64url asset hashes; admitted as a regression target"
+# Empty, and the whole corpus is expected green. It last held ``pnpm-io-001`` and
+# ``pnpm-io-002``, whose Vite base64url hashes (``/assets/index-CxL6fshY.js``) FR-44's
+# hex-only patterns could not reach; ``asset.dashed_base64`` closed that gap and the strict
+# xfails turned into failures, which is how this list is meant to shrink.
+KNOWN_RED: frozenset[str] = frozenset()
+KNOWN_RED_REASON = "admitted by independent review before the ruleset could neutralize it"
 
 # T-21's gate is the full noise_only corpus, which is why the target count is asserted below.
 NOISE_ONLY_TARGET = 20

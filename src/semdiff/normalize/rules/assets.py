@@ -25,6 +25,26 @@ _EXT = f"(?:{'|'.join(sorted(ASSET_EXTENSIONS))})"
 # A build hash, not a version or a counter: hex, 8+ chars, with at least one digit and one
 # hex letter. Keeps `main.12345678.js` and `main.abcdefgh.js` out.
 _HEX = r"(?=[0-9a-f]*[0-9])(?=[0-9a-f]*[a-f])[0-9a-f]{8,32}"
+# Vite, Rollup and Astro emit base64url hashes rather than hex: `index-CjpiBuHV.js`,
+# `common.CQ2eGxR-.css`, `style.C_NjyM-H.css`. Three fences, each measured against the 83
+# such hashes in the T-21 captures and the non-hash segments standing in the same position:
+#
+#   length   exactly 8 — all 83 are, while the real non-hashes there are font weights at
+#            6, 7, 13 and 14 characters (`AlibabaSans-Medium.woff`, `Inter-Regular-subset`)
+#   shape    two or more uppercase letters (the observed minimum, met by all 83) and at
+#            least one character that is not uppercase, which keeps `app-SETTINGS.css` out
+#   words    not two CamelCase words, which is what a hand-written `logo-DarkMode.png` is
+#            and what no generated hash in the captures looks like
+#
+# Uppercase is also what separates these from _HEX, so a base64url rule and a hex rule can
+# never both fire on the same URL. Tokens that fail these fences keep their hash: the noise
+# survives, which is the safe direction — a wrong strip would hide a real change instead.
+_BASE64URL = (
+    r"(?=(?:[A-Za-z0-9_-]*[A-Z]){2})"
+    r"(?=[A-Za-z0-9_-]*[a-z0-9])"
+    r"(?![A-Z][a-z]+[A-Z][a-z]+\.)"
+    r"[A-Za-z0-9_-]{8}"
+)
 _CACHE_BUSTER_KEYS = "v ver rev t cb _".split()
 
 
@@ -45,6 +65,10 @@ ASSET_RULES: tuple[NormalizationRule, ...] = (
     _rule("asset.dotted_hash", rf"(?P<hash>\.{_HEX})(?=\.{_EXT}(?![A-Za-z0-9]))"),
     # Next.js chunks: <name>-<hash>.<ext>
     _rule("asset.dashed_hash", rf"(?P<hash>-{_HEX})(?=\.{_EXT}(?![A-Za-z0-9]))"),
+    # Rollup, Vite, Astro: <name>.<base64url>.<ext>
+    _rule("asset.dotted_base64", rf"(?P<hash>\.{_BASE64URL})(?=\.{_EXT}(?![A-Za-z0-9]))"),
+    # Vite entry bundles: <name>-<base64url>.<ext>
+    _rule("asset.dashed_base64", rf"(?P<hash>-{_BASE64URL})(?=\.{_EXT}(?![A-Za-z0-9]))"),
     # Next.js build id as its own path segment, e.g. /_next/static/<id>/_buildManifest.js
     _rule("asset.next_build_id", r"(?<=/_next/static/)(?P<hash>[A-Za-z0-9_-]{16,}/)"),
     # Sphinx-style cache buster, only as the sole query of an asset URL.

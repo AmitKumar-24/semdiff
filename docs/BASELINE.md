@@ -3,7 +3,7 @@
 What the standard tools report on the 20 `noise_only` corpus pairs, measured rather than
 asserted. Every pair is a real before/after capture of a page whose content did not change
 (admitted by independent human review, D-021), so **every change any tool reports here is a
-false positive** — with the two exceptions noted at the end.
+false positive**. SemDiff reports none of them.
 
 Reproduce it:
 
@@ -46,8 +46,8 @@ Each number is "how many changes would this tool show a user". `0` means it repo
 | docusaurus-io-003 | asset_hash | 92 | 1 | 3 | 0 | 0 | 0 |
 | docusaurus-io-004 | asset_hash | 61 | 1 | 3 | 0 | 0 | 0 |
 | docusaurus-io-005 | asset_hash | 65 | 1 | 2 | 0 | 0 | 0 |
-| pnpm-io-001 | asset_hash | 9 | 1 | 1 | 0 | 0 | 1 |
-| pnpm-io-002 | asset_hash | 9 | 1 | 1 | 0 | 0 | 1 |
+| pnpm-io-001 | asset_hash | 9 | 1 | 1 | 0 | 0 | 0 |
+| pnpm-io-002 | asset_hash | 9 | 1 | 1 | 0 | 0 | 0 |
 | reactnative-dev-001 | asset_hash | 96 | 1 | 2 | 0 | 0 | 0 |
 | reactnative-dev-002 | asset_hash | 104 | 1 | 2 | 0 | 0 | 0 |
 | reactnative-dev-003 | asset_hash | 96 | 1 | 1 | 0 | 0 | 0 |
@@ -60,14 +60,13 @@ Each number is "how many changes would this tool show a user". `0` means it repo
 | `difflib_words` | **20** | 38 | 82.3 |
 | `difflib_text` | 6 | 12 | 22.0 |
 | `lxml_htmldiff` | 6 | 12 | 103.1 |
-| `semdiff` | **2** | 2 | 522.0 |
+| `semdiff` | **0** | 0 | 523.9 |
 
 ## What the numbers mean
 
 **A raw diff flags every single pair.** Twenty unchanged pages, twenty reported changes. For a
 monitoring tool that is twenty alerts nobody wanted, which is the complaint this project exists
-to answer (changedetection.io #2548). SemDiff reduces that to two, and both remaining ones have
-a known cause (below).
+to answer (changedetection.io #2548). SemDiff reports nothing on any of the twenty.
 
 **The volume per alert is small, and that is not the point.** Each flagged pair differs by one
 to three units, not "hundreds of changes". The problem is the false-positive *rate*, not the
@@ -101,19 +100,24 @@ every normalization rule over the tree, and more than 95% of it is the rule engi
 the parser (F-012). Three of the five largest corpus pages are over the NFR-3 budget of 100 ms
 per page, and no optimization work has been done yet (F-009, F-012).
 
-Stated plainly: **this benchmark buys a 10× reduction in false positives with a 5× increase in
-runtime.** For a monitoring host checking thousands of pages, that trade needs to be a choice
+Stated plainly: **this benchmark trades a 5× increase in runtime for twenty fewer false
+positives.** For a monitoring host checking thousands of pages that trade needs to be a choice
 made with numbers in hand, which is why both columns are published together. The slowness is a
 known, unaddressed defect, not a design goal.
 
-## The two pairs SemDiff still flags
+## How the last two were closed
 
-`pnpm-io-001` and `pnpm-io-002` are false positives of SemDiff's own, with one cause: FR-44
-matches lowercase-hex content hashes, and Vite emits base64url ones
-(`/assets/index-CxL6fshY.js`). Both pairs were admitted to the corpus by independent review
-knowing the ruleset could not yet neutralize them, and both are `xfail(strict=True)` in
-`tests/corpus/test_noise_only_gate.py`, so extending FR-44 will make those tests fail until
-the exemption is removed. No rule was changed to improve this table.
+Until FR-44 was extended, `pnpm-io-001` and `pnpm-io-002` were false positives of SemDiff's
+own: FR-44 matched lowercase-hex content hashes only, and Vite emits base64url ones
+(`/assets/index-CxL6fshY.js`). Both were admitted to the corpus by independent review knowing
+the ruleset could not yet neutralize them, and both were `xfail(strict=True)` in
+`tests/corpus/test_noise_only_gate.py`.
+
+`asset.dotted_base64` and `asset.dashed_base64` (D-042) closed the gap, the strict xfails
+became failures, and the exemption list is now empty — which is the mechanism working as
+designed rather than a list quietly going stale. The rule was written against the 83 base64url
+hashes observed across the capture rounds and the non-hash segments standing in the same
+position; it was not tuned to these two fixtures, and no fixture was edited.
 
 ## What this benchmark does not measure
 

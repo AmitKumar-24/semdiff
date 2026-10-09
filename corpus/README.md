@@ -64,11 +64,13 @@ credential-shaped material into the repository.
 | `docs.python.org/3/library/bisect.html` | 3 | Rejected, surplus | Qualified as a `timestamp` pair, but docs.python.org was at the six-per-host cap. Of the six qualifying Python pairs it is the closest shape-twin of `heapq` (1173 vs 1200 elements, 49.9 vs 59.6 KB), so dropping it costs the least independence; the five admitted pairs span 387 to 1780 elements. |
 | `tauri.app/start/` | 3 | Rejected, sensitive material | The only difference was a rotating `data-netlify-cwv-token` JWT, which embeds Netlify site, account and deploy ids. Admitting the pair would commit a signed token to the repository and would trip secret scanners. The pair is otherwise clean, and the token family is in any case outside the families accepted during T-21 collection. |
 
-`pnpm-io-001` is admitted deliberately as a **known-red** fixture: the review found a single
-Vite base64url asset hash, which FR-44's hex-only pattern does not match, so SemDiff does not
-yet normalize the pair to equality. It is the regression target for a later FR-44 extension,
-on the same pattern as `docs-python-org-001` before D-041. No rule was changed to accommodate
-it, and no fixture is ever edited to make code pass.
+`pnpm-io-001` and `pnpm-io-002` were admitted deliberately as **known-red** fixtures: the
+review found a single Vite base64url asset hash, which FR-44's original hex-only pattern did
+not match, so SemDiff did not yet normalize either pair to equality. They were the regression
+target for the FR-44 extension, on the same pattern as `docs-python-org-001` before D-041.
+D-042 shipped that extension and both pairs now normalize identically; the exemption list in
+`tests/corpus/test_noise_only_gate.py` is empty and the whole corpus is expected green. No rule
+was changed to accommodate a fixture, and no fixture is ever edited to make code pass.
 
 
 ## Capture and licensing

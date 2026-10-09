@@ -38,6 +38,20 @@ POSITIVE = [
     ("asset.query_cache_buster", "../_static/pydoctheme.css?v=4365c8fe", "../_static/pydoctheme.css"),
     ("asset.query_cache_buster", "../_static/doctools.js?v=9bcbadda", "../_static/doctools.js"),
     ("asset.query_cache_buster", "/app.css?ver=1a2b3c4d", "/app.css"),
+    # Rollup / Vite / Astro base64url: <name>.<hash>.<ext>
+    ("asset.dotted_base64", "/assets/chunks/theme.BImhtZeh.js", "/assets/chunks/theme.js"),
+    ("asset.dotted_base64", "/_astro/common.CQ2eGxR-.css", "/_astro/common.css"),
+    ("asset.dotted_base64", "/assets/style.C_NjyM-H.css", "/assets/style.css"),
+    ("asset.dotted_base64", "/fonts/inter-roman-latin.Cy4MYw_J.woff", "/fonts/inter-roman-latin.woff"),
+    ("asset.dotted_base64", "/logo-light.BTLa6bQG.svg", "/logo-light.svg"),
+    ("asset.dotted_base64", "/assets/app.BuWgJKRa.js", "/assets/app.js"),
+    # Vite entry bundles: <name>-<hash>.<ext>  (the pnpm-io fixtures)
+    ("asset.dashed_base64", "/assets/index-CjpiBuHV.js", "/assets/index.js"),
+    ("asset.dashed_base64", "/assets/index-CxL6fshY.js", "/assets/index.js"),
+    ("asset.dashed_base64", "/assets/index-67LBnYfl.js", "/assets/index.js"),
+    ("asset.dashed_base64", "/assets/index-eKBMIA92.js", "/assets/index.js"),
+    ("asset.dashed_base64", "/assets/index-gKrm_uHA.css", "/assets/index.css"),
+    ("asset.dashed_base64", "/assets/index-DD5X4HF3.css", "/assets/index.css"),
 ]
 
 # Meaningful URLs from the same captures. No asset rule may alter any of them.
@@ -67,6 +81,23 @@ NEGATIVE = [
     "/assets/js/main.abcdefgh.js",  # letters only, and 'g','h' are not hex
     "/_next/static/chunks/app.js",  # 'chunks' is too short to be a build id
     "/_next/static/media/logo.svg",
+    # real font filenames from the same captures: an uppercase-bearing segment that is a
+    # word, not a hash — 6, 7, 13 and 14 characters rather than 8
+    "/fonts/AlibabaSans-Medium.woff",
+    "/fonts/AlibabaSans-Regular.woff",
+    "/fonts/Inter-Regular-subset.woff",
+    "/fonts/SpaceGrotesk-Medium-subset.woff",
+    # eight characters, but all-caps words rather than a hash
+    "/css/app-SETTINGS.css",
+    "/css/app-CALENDAR.css",
+    # eight characters of two CamelCase words: what a hand-written asset name looks like
+    "/img/logo-DarkMode.png",
+    "/css/theme-LiteMode.css",
+    "/img/icon-MainPage.svg",
+    "/img/hero-SideMenu.png",
+    # lowercase-only and digit-only segments stay the hex rules' business, and they reject these
+    "/assets/index-abcdefgh.js",
+    "/assets/index-12345678.js",
 ]
 
 
@@ -141,7 +172,9 @@ def test_script_contents_are_never_touched() -> None:
 def test_family_is_registered_with_stable_ids_phase_and_target() -> None:
     ids = [rule.id for rule in BUILTIN_RULES.ordered() if rule.family is RuleFamily.ASSET_HASH]
     assert ids == sorted(BY_ID) == [
+        "asset.dashed_base64",
         "asset.dashed_hash",
+        "asset.dotted_base64",
         "asset.dotted_hash",
         "asset.next_build_id",
         "asset.query_cache_buster",
@@ -217,3 +250,32 @@ def test_config_hash_changes_when_the_family_ships() -> None:
     # D-028: the ruleset fingerprint covers every rule id and version.
     assert Config().config_hash.startswith("sha256:")
     assert all(rule.version == 1 for rule in ASSET_RULES)
+
+
+# ---- base64url hashes (FR-44 extension) ---------------------------------------------------
+def test_base64url_and_hex_rules_are_mutually_exclusive() -> None:
+    """Uppercase is the fence between them, so no URL can be claimed by both."""
+    hex_ids = {"asset.dotted_hash", "asset.dashed_hash"}
+    b64_ids = {"asset.dotted_base64", "asset.dashed_base64"}
+    for _rule_id, url, _expected in POSITIVE:
+        fired = {rule.id for rule in ASSET_RULES if rule.matcher.matches(url)}
+        assert not (fired & hex_ids and fired & b64_ids), url
+
+
+def test_base64url_hash_length_is_exactly_eight() -> None:
+    """Seven or nine characters is not Vite's output, and length is the first fence."""
+    assert first('<script src="/assets/index-CjpiBuH.js"></script>') == "/assets/index-CjpiBuH.js"
+    assert first('<script src="/assets/index-CjpiBuHVx.js"></script>') == "/assets/index-CjpiBuHVx.js"
+    assert first('<script src="/assets/index-CjpiBuHV.js"></script>') == "/assets/index.js"
+
+
+def test_double_extension_bundles_are_not_matched() -> None:
+    """Known gap: Rollup's `.lean.js` puts a non-asset extension between hash and suffix."""
+    url = "/assets/introduction_index.md.Dd_dCLWs.lean.js"
+    assert [rule.id for rule in ASSET_RULES if rule.matcher.matches(url)] == []
+
+
+def test_two_vite_deploys_of_the_same_page_converge() -> None:
+    old = '<script type="module" src="/assets/index-CxL6fshY.js"></script>'
+    new = '<script type="module" src="/assets/index-67LBnYfl.js"></script>'
+    assert normalize(old) == normalize(new)
