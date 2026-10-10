@@ -220,3 +220,57 @@ def test_foreign_content_attribute_case_survives_sorting() -> None:
     once = canon(html)
     assert '<svg fill="none" viewBox="0 0 16 16" width="18">' in once
     assert canon(once) == once
+
+
+# ---- attribute-count short circuit --------------------------------------------------------
+@pytest.mark.parametrize(
+    "html",
+    [
+        "<div>t</div>",  # zero attributes
+        '<div class="a">t</div>',  # one attribute
+        '<div id="a">t</div>',
+        "<img>",  # zero, void element
+        '<img src="/a.png">',  # one, void element
+    ],
+    ids=["zero", "one-class", "one-id", "zero-void", "one-void"],
+)
+def test_fewer_than_two_attributes_reports_nothing(html: str) -> None:
+    """An element with 0 or 1 attributes cannot be mis-ordered, so attr_order must stay silent."""
+    assert [a for a in fired(html) if a[0] == "canonical.attr_order"] == []
+
+
+@pytest.mark.parametrize(
+    ("html", "before", "after", "serialized"),
+    [
+        ('<div id="b" class="a">t</div>', "id class", "class id", '<div class="a" id="b">'),
+        ('<div class="a" id="b">t</div>', "", "", '<div class="a" id="b">'),  # already sorted
+        (
+            '<img src="/a.png" alt="x" width="2" id="i">',
+            "src alt width id",
+            "alt id src width",
+            '<img alt="x" id="i" src="/a.png" width="2">',
+        ),
+    ],
+    ids=["two-unsorted", "two-sorted", "four-unsorted"],
+)
+def test_two_or_more_attributes_still_sort(html: str, before: str, after: str, serialized: str) -> None:
+    apps = [a for a in fired(html) if a[0] == "canonical.attr_order"]
+    assert apps == ([("canonical.attr_order", before, after)] if before else [])
+    assert serialized in canon(html)
+
+
+def test_short_circuit_does_not_change_a_mixed_document() -> None:
+    """Elements above and below the threshold, in one tree: only the multi-attribute ones fire."""
+    html = (
+        "<div>"  # 0
+        '<p class="x">one</p>'  # 1
+        '<a id="l" href="/x">two</a>'  # 2, unsorted
+        '<span class="c" id="s">three</span>'  # 2, already sorted
+        "</div>"
+    )
+    assert [a for a in fired(html) if a[0] == "canonical.attr_order"] == [
+        ("canonical.attr_order", "id href", "href id")
+    ]
+    out = canon(html)
+    assert '<a href="/x" id="l">' in out and '<span class="c" id="s">' in out
+    assert canon(out) == out

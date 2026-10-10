@@ -14,8 +14,19 @@ python -m tests.baseline.report --repeat 5
 ```
 
 Measured on Python 3.12.10, Windows 11, lxml 6.1.3, selectolax 0.4.11, best of 5 runs.
-Timings are wall clock for a whole pair (both snapshots) on one unquiet laptop: compare the
-tools against each other, not against another machine's numbers.
+Timings are wall clock for a whole pair (both snapshots) on one laptop that was **not idle** —
+about 70% of its CPU was going to unrelated desktop applications — and three runs of the same
+command minutes apart spread the absolute numbers by a factor of two:
+
+| run | `difflib_lines` | `difflib_words` | `difflib_text` | `lxml_htmldiff` | `semdiff` | `semdiff` ÷ `lxml_htmldiff` |
+|---|---:|---:|---:|---:|---:|---:|
+| 1 | 1.6 | 51.8 | 13.4 | 64.6 | 185.9 | 2.88 |
+| 2 | 2.2 | 100.5 | 26.3 | 127.4 | 360.7 | 2.83 |
+| 3 (published below) | 1.7 | 66.9 | 24.6 | 124.6 | 372.8 | 2.99 |
+
+The change counts are identical in all three runs; only the milliseconds move. **Compare the
+tools against each other, not against another machine's numbers** — the last column is the one
+figure that survived a 2× swing in machine load.
 
 ## What each column is
 
@@ -56,11 +67,11 @@ Each number is "how many changes would this tool show a user". `0` means it repo
 
 | tool | pairs flagged of 20 | total units | median ms |
 |---|---:|---:|---:|
-| `difflib_lines` | **20** | 20 | 1.8 |
-| `difflib_words` | **20** | 38 | 82.3 |
-| `difflib_text` | 6 | 12 | 22.0 |
-| `lxml_htmldiff` | 6 | 12 | 103.1 |
-| `semdiff` | **0** | 0 | 523.9 |
+| `difflib_lines` | **20** | 20 | 1.7 |
+| `difflib_words` | **20** | 38 | 66.9 |
+| `difflib_text` | 6 | 12 | 24.6 |
+| `lxml_htmldiff` | 6 | 12 | 124.6 |
+| `semdiff` | **0** | 0 | 372.8 |
 
 ## What the numbers mean
 
@@ -93,17 +104,57 @@ they handle it.
 
 ## The tradeoff: SemDiff is slower
 
-SemDiff is the slowest tool in this comparison by a wide margin — **522 ms** median per pair
-against 103 ms for `lxml.html.diff` and 1.8 ms for the line differ: roughly 5× the HTML-aware
-differ and 290× the byte-level one. That is the price of parsing both documents and running
-every normalization rule over the tree, and more than 95% of it is the rule engine rather than
-the parser (F-012). Three of the five largest corpus pages are over the NFR-3 budget of 100 ms
-per page, and no optimization work has been done yet (F-009, F-012).
+SemDiff is still the slowest tool in this comparison — **373 ms** median per pair against
+125 ms for `lxml.html.diff` and 1.7 ms for the line differ: 3.0× the HTML-aware differ and
+219× the byte-level one. That is the price of parsing both documents and running every
+normalization rule over the tree, and it is almost all rule engine: parsing a document takes
+**2.46 ms**, 1.3% of `normalize()`, measured on this same corpus and machine.
 
-Stated plainly: **this benchmark trades a 5× increase in runtime for twenty fewer false
+Three optimizations have landed since this table was first published, and the ratio moved from
+**5.1× `lxml.html.diff` to 2.9×** (523.9 ms against 103.1 ms, before). The controlled A/Bs
+below put their combined saving at roughly 56 ms per document off about 135 ms — 1.7×, which is
+what the published ratio independently shows (5.08 → 2.90 is 1.75×).
+
+**NFR-3 is not met.** The target is sub-100 ms per page pair. The median pair here is 373 ms,
+and the quietest of the three runs still measured 186 ms. The 79 ms per document from the
+controlled A/B is not evidence to the contrary: it is a single document at the quietest moment
+of the session, not the pair path NFR-3 names, and the same measurement taken on a busier
+machine minutes later gave 184 ms. What has changed is the size of the gap — 3× the HTML-aware
+differ rather than 5× — and that the remaining cost is now profiled rather than suspected
+(F-009, F-012).
+
+Stated plainly: **this benchmark trades a 3× increase in runtime for twenty fewer false
 positives.** For a monitoring host checking thousands of pages that trade needs to be a choice
 made with numbers in hand, which is why both columns are published together. The slowness is a
-known, unaddressed defect, not a design goal.
+known defect being worked down, not a design goal.
+
+## Two kinds of measurement here
+
+The table above is the **end-to-end benchmark**: in-repo, reproducible with the commands at the
+top, measuring the whole public path (`normalize(old) == normalize(new)`) exactly as a caller
+meets it. Its weakness is visible in the three-run table — the absolute milliseconds swing by a
+factor of two with whatever else the machine is doing, which is more than any single
+optimization here is worth. It cannot settle a 5% question, and F-012 records that lesson being
+learned the hard way.
+
+Each optimization was therefore measured by a **controlled interleaved A/B**: the shipped
+function and a verbatim copy of the pre-change code, alternating in one process over all 40
+corpus snapshots, best of five. Both variants meet the same machine load, so load drift cancels
+instead of being mistaken for a result. Those harnesses were one-off and are not in the
+repository; what is in the repository is the equivalence evidence, which is the part that must
+not rot.
+
+| change | what it replaced | measured |
+|---|---|---|
+| `canonical.attr_order` skips elements with fewer than two attributes | re-serializing every element's start tag to read back its attribute names | 1.56× on the rule, 101 ms corpus-wide, ≈3.9% of `normalize()` |
+| the protected text-node set is precomputed once per rule pass | an ancestor walk per text node per TEXT rule | 3.40× on the TEXT passes, 24.4 ms per document |
+| consecutive attribute rules share one name-indexed traversal | one traversal and one call per element per rule, 20 of them | 1.37× on `apply_rules`, 26.4 ms per document, 25% of `normalize()` |
+
+Not one of the three touches a rule, an id, a version, a phase or the `config_hash`. Each was
+checked for exactness before it was timed, on all 40 corpus snapshots: byte-identical
+serialized trees and identical application records, locators included. For the third that check
+is now a test rather than a script — `tests/corpus/test_fused_attribute_equivalence.py`, one
+case per snapshot, against the pre-fusion engine kept in `tests/normalize/reference.py`.
 
 ## How the last two were closed
 
@@ -129,4 +180,5 @@ position; it was not tuned to these two fixtures, and no fixture was edited.
   F-023), so FR-5, FR-6 and FR-7 have no real-world coverage here — only synthetic unit tests.
 - **Layer 1 only.** `semdiff` in this table is `normalize(old) == normalize(new)`, not typed
   change objects. The change-detection layers do not exist yet.
-- **More than one machine.** One laptop, one run of five. Treat the ratios as the result.
+- **More than one machine.** One laptop, three runs of five, and the laptop was not idle.
+  Treat the ratios as the result.

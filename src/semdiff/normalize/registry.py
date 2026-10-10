@@ -27,6 +27,8 @@ from semdiff.normalize.model import (
 from semdiff.parse import ParsedDoc
 
 PROTECTED_TEXT_PARENTS = frozenset({"script", "style", "template"})
+_FUSABLE_TARGETS = frozenset({Target.ATTRIBUTE, Target.ATTRIBUTE_VALUE, Target.ATTRIBUTE_SUBSTRING})
+_PROTECTED_TEXT_SELECTOR = ", ".join(sorted(PROTECTED_TEXT_PARENTS))
 PROTECTED_ATTRIBUTES = frozenset(
     {"itemid", "itemref", "itemtype", "itemprop", "itemscope", "about", "resource", "typeof", "property", "vocab", "prefix"}
 )
@@ -84,12 +86,87 @@ def apply_rules(doc: ParsedDoc, registry: RuleRegistry, config: NormalizationCon
     """Run the effective rules over a copy of ``doc``'s tree; the input document is untouched."""
     tree = LexborHTMLParser(doc.tree.html or "")
     applications: list[RuleApplication] = []
-    for rule in registry.effective(config):
-        applications.extend(_apply(rule, tree))
+    for run in _runs(registry.effective(config)):
+        if len(run) > 1:
+            applications.extend(_apply_attribute_rules(run, tree))
+        else:
+            applications.extend(_apply(run[0], tree))
     return NormalizedDoc(tree=tree, applied_rules=applications)
 
 
+def _fusable(rule: NormalizationRule) -> bool:
+    """Whether the fused pass can run ``rule``: exactly the rules ``_apply`` hands to
+    ``_apply_attributes``."""
+    return rule.target in _FUSABLE_TARGETS and rule.action not in (
+        Action.CANONICALIZE,
+        Action.REPLACE_WITH_PLACEHOLDER,
+    )
+
+
+def _runs(rules: list[NormalizationRule]) -> list[list[NormalizationRule]]:
+    """The effective rules, with *consecutive* fusable attribute rules grouped into one run.
+
+    Only neighbours are ever merged, so every rule keeps its ``(phase, id)`` position relative
+    to every rule the fused pass cannot run: the TEXT rules, which sit between phase 30 and
+    phase 50 in the builtin set, and the node-dropping and canonical transforms, which change
+    the tree's shape and must still see it exactly when they did.
+    """
+    runs: list[list[NormalizationRule]] = []
+    for rule in rules:
+        if runs and _fusable(rule) and _fusable(runs[-1][-1]):
+            runs[-1].append(rule)
+        else:
+            runs.append([rule])
+    return runs
+
+
+def _apply_attribute_rules(
+    rules: list[NormalizationRule], tree: LexborHTMLParser
+) -> list[RuleApplication]:
+    """Run a run of attribute rules in one traversal, indexed by the names they can touch.
+
+    One pass per rule costs a traversal and an ``_apply_attributes`` call per element per rule,
+    and the builtin set spends 20 of them (F-009). Here each element is visited once and is
+    offered only the rules that declare an attribute it actually carries. The index can
+    over-admit -- an earlier rule in the same run may already have stripped the attribute --
+    but it cannot under-admit, because no branch of ``_apply_attributes`` ever introduces an
+    attribute name: names only disappear, or keep their value rewritten in place.
+
+    Equivalence with one pass per rule rests on attribute rules being node-local: each touches
+    only the node it is handed, never a sibling, an ancestor or the shape of the tree. So per
+    element the rules still see each other's work in ``(phase, id)`` order, which is the only
+    order in which they can interact. Reporting stays rule-major: each application is collected
+    with its rule's position and the document order it was made in, then sorted back.
+    """
+    if tree.root is None:
+        return []
+    positions: dict[str, list[int]] = {}
+    wildcard: list[int] = []  # a rule naming no attributes is free to touch any of them
+    for position, rule in enumerate(rules):
+        if rule.attributes:
+            for name in rule.attributes:
+                positions.setdefault(name, []).append(position)
+        else:
+            wildcard.append(position)
+    collected: list[tuple[int, int, RuleApplication]] = []
+    order = 0
+    for node in tree.root.traverse():
+        names = node.attributes if node.is_element_node else {}
+        if not names:
+            continue
+        candidates = set(wildcard)
+        for name in names:
+            candidates.update(positions.get(name, ()))
+        for position in sorted(candidates):
+            for application in _apply_attributes(rules[position], node):
+                collected.append((position, order, application))
+                order += 1
+    collected.sort(key=lambda item: (item[0], item[1]))
+    return [application for _, _, application in collected]
+
+
 def _apply(rule: NormalizationRule, tree: LexborHTMLParser) -> Iterable[RuleApplication]:
+    """One rule, one traversal. Runs of attribute rules go through the fused pass instead."""
     if rule.action is Action.CANONICALIZE:
         if rule.transform is None:
             raise ValueError(f"rule {rule.id!r} is CANONICALIZE but has no transform")
@@ -98,15 +175,19 @@ def _apply(rule: NormalizationRule, tree: LexborHTMLParser) -> Iterable[RuleAppl
         raise NotImplementedError("REPLACE_WITH_PLACEHOLDER arrives with T-18")
     nodes = list(tree.root.traverse(include_text=True)) if tree.root is not None else []
     if rule.target is Target.TEXT:
-        return [a for node in nodes if node.tag == "-text" for a in _apply_text(rule, node)]
+        protected = _protected_text_nodes(tree)
+        return [
+            a
+            for node in nodes
+            if node.tag == "-text" and node not in protected
+            for a in _apply_text(rule, node)
+        ]
     if rule.target is Target.NODE:
         return [a for node in nodes if node.is_element_node for a in _apply_node(rule, node)]
     return [a for node in nodes if node.is_element_node for a in _apply_attributes(rule, node)]
 
 
 def _apply_text(rule: NormalizationRule, node: LexborNode) -> list[RuleApplication]:
-    if _inside_protected(node):
-        return []
     before = node.text_content or ""
     if not rule.matcher.matches(before):
         return []
@@ -116,14 +197,24 @@ def _apply_text(rule: NormalizationRule, node: LexborNode) -> list[RuleApplicati
     return [RuleApplication(rule.id, locator, before, after)]
 
 
-def _inside_protected(node: LexborNode) -> bool:
-    """D-029: a text node anywhere under <script>/<style>/<template> is off limits."""
-    ancestor = node.parent
-    while ancestor is not None:
-        if ancestor.tag in PROTECTED_TEXT_PARENTS:
-            return True
-        ancestor = ancestor.parent
-    return False
+def _protected_text_nodes(tree: LexborHTMLParser) -> set[LexborNode]:
+    """D-029: every text node under <script>/<style>/<template>, which TEXT rules must not touch.
+
+    Collected once per pass instead of walking each text node's ancestors: a node is protected
+    iff it descends from a protected element, so selecting those elements and taking their text
+    descendants decides exactly the same thing, without the per-node climb. Lexbor compares and
+    hashes a node by the underlying DOM node rather than by the wrapper, so a node collected
+    here is still found when the caller tests the nodes of its own traversal. The set is built
+    per pass, never cached across rules, because rules mutate the tree between passes.
+    """
+    if tree.root is None:
+        return set()
+    return {
+        text
+        for element in tree.css(_PROTECTED_TEXT_SELECTOR)
+        for text in element.traverse(include_text=True)
+        if text.tag == "-text"
+    }
 
 
 def _apply_node(rule: NormalizationRule, node: LexborNode) -> list[RuleApplication]:

@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 
 import pytest
+from selectolax.lexbor import LexborHTMLParser
 
 from semdiff import Config, NormalizationConfig, parse
 from semdiff.normalize import (
@@ -16,7 +17,14 @@ from semdiff.normalize import (
     Target,
     apply_rules,
 )
-from semdiff.normalize.registry import BUILTIN_RULES, ruleset_fingerprint
+from semdiff.normalize.registry import (
+    BUILTIN_RULES,
+    _fusable,
+    _protected_text_nodes,
+    _runs,
+    ruleset_fingerprint,
+)
+from tests.normalize.reference import apply_rules_per_rule, records
 
 HTML = (
     b'<div id="react-root-7a3b2c" class="card css-1abc2d" data-token="abc">'
@@ -231,3 +239,164 @@ def test_ruleset_fingerprint_tracks_versions_and_feeds_config_hash(monkeypatch: 
 def test_builtin_registry_holds_only_shipped_families() -> None:
     families = {r.family for r in BUILTIN_RULES.ordered()}
     assert families == set(RuleFamily)  # every family ships (T-13..T-17)
+
+
+# --- D-029 text protection -------------------------------------------------------------------
+# The protected set is precomputed once per rule pass, so these pin the behaviour it replaces:
+# a text node under <script>/<style>/<template> is never rewritten, however deep it sits.
+
+STAMP_RULE = rule(
+    "test.text.stamp", family=RuleFamily.TIMESTAMP, target=Target.TEXT,
+    pattern=r"STAMP", attributes=frozenset(), phase=40,
+)
+PROTECTED_HTML = {
+    "script": b"<p>at STAMP</p><script>var t = 'STAMP';</script>",
+    "style": b"<p>at STAMP</p><style>.a:after{content:'STAMP'}</style>",
+    "template": b"<p>at STAMP</p><template>STAMP</template>",
+}
+
+
+@pytest.mark.parametrize("tag", ["script", "style", "template"])
+def test_text_rules_never_enter_a_protected_element(tag: str) -> None:
+    """<template> is protected twice over: Lexbor keeps its contents in a detached fragment, so a
+    traversal never offers them anyway. The tag stays in the set for the whitespace rule, which
+    reads it too, and for a second backend (T-11) that may well expose those nodes.
+    """
+    result = apply_rules(parse(PROTECTED_HTML[tag]), make_registry(STAMP_RULE), NormalizationConfig())
+    assert "STAMP" in (result.tree.css_first(tag).html or "")
+    assert result.tree.css_first("p").text() == "at "
+    assert [(a.rule_id, a.before, a.after) for a in result.applied_rules] == [
+        ("test.text.stamp", "at STAMP", "at ")
+    ]
+
+
+def test_protection_covers_deep_and_foreign_content() -> None:
+    html = (
+        b"<div><section><style>deep STAMP</style></section></div>"
+        b"<svg><script>svg STAMP</script></svg><p>plain STAMP</p>"
+    )
+    result = apply_rules(parse(html), make_registry(STAMP_RULE), NormalizationConfig())
+    assert [(a.before, a.after) for a in result.applied_rules] == [("plain STAMP", "plain ")]
+    assert "deep STAMP" in (result.tree.css_first("style").html or "")
+    assert "svg STAMP" in (result.tree.css_first("script").html or "")
+
+
+def test_protection_holds_after_earlier_text_nodes_are_replaced() -> None:
+    """A pass precomputes the set and then rewrites text as it walks. Replacing one text node
+    must not cost a later protected node its protection, so interleave the two kinds.
+    """
+    html = (
+        b"<p>a STAMP</p><script>keep STAMP</script><p>b STAMP</p>"
+        b"<style>keep STAMP</style><p>c STAMP</p>"
+    )
+    result = apply_rules(parse(html), make_registry(STAMP_RULE), NormalizationConfig())
+    assert [(a.before, a.after) for a in result.applied_rules] == [
+        ("a STAMP", "a "), ("b STAMP", "b "), ("c STAMP", "c ")
+    ]
+    assert result.tree.css_first("script").text() == "keep STAMP"
+    assert "keep STAMP" in (result.tree.css_first("style").html or "")
+
+
+def test_protected_set_membership_survives_a_second_traversal() -> None:
+    """What the precompute rests on: Lexbor hashes and compares a node by the DOM node it wraps,
+    not by the wrapper object, so a set built from one traversal answers for another. Pinned
+    here so a backend that drops that behaviour fails loudly instead of quietly rewriting
+    script contents (the F-027 lesson).
+    """
+    tree = LexborHTMLParser("<p>x</p><script>s</script>")
+    protected = _protected_text_nodes(tree)
+    assert tree.root is not None
+    texts = [n for n in tree.root.traverse(include_text=True) if n.tag == "-text"]
+    assert [n.text_content for n in texts if n in protected] == ["s"]
+    assert [n.text_content for n in texts if n not in protected] == ["x"]
+
+
+# --- the fused attribute pass ----------------------------------------------------------------
+# Runs of consecutive attribute rules share one traversal, so these pin the two things fusing
+# could plausibly break: the order rules interact in on a given node, and the order their
+# applications are reported in.
+
+CLASS_A = rule("test.fused.a", pattern=r"^a-\d$", phase=10)
+CLASS_B = rule("test.fused.b", pattern=r"^b-\d$", phase=11)
+TWO_ELEMENTS = b'<p class="a-1 b-1 keep">x</p><span class="a-2 b-2">y</span>'
+
+
+def test_several_rules_on_one_attribute_report_in_rule_major_order() -> None:
+    """Reporting is rule-major and document-order within a rule, as one pass per rule gave.
+
+    The ``before`` values are the proof that the rules still interact per node in (phase, id)
+    order: ``test.fused.b`` sees the class list ``test.fused.a`` already shortened.
+    """
+    result = apply_rules(parse(TWO_ELEMENTS), make_registry(CLASS_A, CLASS_B), NormalizationConfig())
+    assert [(a.rule_id, a.before, a.after) for a in result.applied_rules] == [
+        ("test.fused.a", "a-1 b-1 keep", "b-1 keep"),
+        ("test.fused.a", "a-2 b-2", "b-2"),
+        ("test.fused.b", "b-1 keep", "keep"),
+        ("test.fused.b", "b-2", ""),
+    ]
+    assert result.tree.css_first("p").attributes["class"] == "keep"
+    assert "class" not in result.tree.css_first("span").attributes  # STRIP took the last token
+
+
+def test_fused_run_matches_one_pass_per_rule_including_locators() -> None:
+    registry = make_registry(CLASS_A, CLASS_B, ID_RULE, TEXT_RULE, NODE_RULE)
+    doc = parse(TWO_ELEMENTS + HTML)
+    assert records(apply_rules(doc, registry, NormalizationConfig())) == records(
+        apply_rules_per_rule(doc, registry, NormalizationConfig())
+    )
+
+
+def test_a_rule_naming_no_attributes_joins_the_run_and_sees_every_element() -> None:
+    """``attributes=frozenset()`` means "any attribute", so the index cannot place such a rule
+    by name; it has to be offered every element that carries attributes at all.
+
+    ``CLASS_A`` is here only to make the run two rules long -- a lone rule needs no fusing and
+    would take the one-pass-per-rule path, leaving the wildcard handling untested. The wildcard
+    sits at the earlier phase, so it is the one that fires.
+    """
+    wildcard = rule("test.fused.any", target=Target.ATTRIBUTE, pattern=r"^a-1$", attributes=frozenset(), phase=9)
+    registry = make_registry(wildcard, CLASS_A)
+    assert [len(run) for run in _runs(registry.effective(NormalizationConfig()))] == [2]
+    html = b'<p class="a-1">x</p><input value="a-1"><br data-x="a-1">'
+    result = apply_rules(parse(html), registry, NormalizationConfig())
+    assert [(a.rule_id, a.before) for a in result.applied_rules] == [
+        ("test.fused.any", "a-1"), ("test.fused.any", "a-1"), ("test.fused.any", "a-1")
+    ]
+    assert "class" not in result.tree.css_first("p").attributes
+
+
+def test_a_rule_whose_attribute_an_earlier_rule_removed_reports_nothing() -> None:
+    """The name index over-admits here -- both rules are offered the element because it carried
+    ``id`` when the traversal reached it -- and over-admitting must stay harmless."""
+    first = rule("test.fused.id1", target=Target.ATTRIBUTE, pattern=r"^gone$", attributes=frozenset({"id"}), phase=20)
+    second = rule("test.fused.id2", target=Target.ATTRIBUTE, pattern=r"^gone$", attributes=frozenset({"id"}), phase=21)
+    result = apply_rules(parse(b'<p id="gone">x</p>'), make_registry(first, second), NormalizationConfig())
+    assert [a.rule_id for a in result.applied_rules] == ["test.fused.id1"]
+
+
+def test_a_dropped_node_is_never_offered_to_a_later_attribute_rule() -> None:
+    """Why only *consecutive* attribute rules fuse: a DROP_NODE rule between two attribute
+    phases changes the tree's shape, so the later attribute rule must run after it, not with
+    the earlier one."""
+    dropper = rule("test.fused.drop", target=Target.NODE, pattern=r"^aside$", action=Action.DROP_NODE,
+                   attributes=frozenset(), phase=30)
+    late = rule("test.fused.src", target=Target.ATTRIBUTE, pattern=r"^/gone$", attributes=frozenset({"src"}), phase=50)
+    html = b'<aside><img src="/gone"></aside><img src="/gone">'
+    registry = make_registry(CLASS_A, dropper, late)
+    result = apply_rules(parse(html), registry, NormalizationConfig())
+    assert [a.rule_id for a in result.applied_rules] == ["test.fused.drop", "test.fused.src"]
+    assert result.tree.css_first("img").attributes.get("src") is None
+    assert records(result) == records(apply_rules_per_rule(parse(html), registry, NormalizationConfig()))
+    assert [len(run) for run in _runs(registry.effective(NormalizationConfig()))] == [1, 1, 1]
+
+
+def test_runs_partition_the_ruleset_without_reordering_it() -> None:
+    rules = BUILTIN_RULES.effective(NormalizationConfig())
+    runs = _runs(rules)
+    assert [r for run in runs for r in run] == rules  # nothing reordered, nothing lost
+    assert all(len(run) == 1 or all(_fusable(r) for r in run) for run in runs)
+    # Phases 10-30 fuse into one pass and phase 50 into another; the TEXT and canonical rules
+    # keep a pass each. Expect to update this shape when rules are added -- what matters is
+    # that the attribute rules land in as few runs as their phase neighbours allow.
+    assert [len(run) for run in runs] == [14, 1, 1, 1, 1, 6, 1, 1, 1]
+    assert sum(1 for r in rules if _fusable(r)) == 20  # 20 traversals became 2

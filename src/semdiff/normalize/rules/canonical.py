@@ -131,6 +131,8 @@ def sort_attributes(rule: NormalizationRule, tree: LexborHTMLParser) -> list[Rul
     if tree.root is None:
         return out
     for node in [n for n in tree.root.traverse() if n.is_element_node]:
+        if len(node.attributes) < 2:
+            continue  # nothing to reorder, and _serialized_names would serialize the subtree
         names = _serialized_names(node)
         if names is None:
             continue  # start tag could not be read back safely: leave this element alone
