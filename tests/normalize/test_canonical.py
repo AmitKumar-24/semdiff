@@ -222,6 +222,15 @@ def test_foreign_content_attribute_case_survives_sorting() -> None:
     assert canon(once) == once
 
 
+def test_whitespace_survives_inside_a_reachable_template() -> None:
+    """``PRESERVED_WHITESPACE_TAGS`` includes the protected parents, and a ``<template>`` in
+    foreign content is the one shape where a traversal actually reaches that text (F-031), so
+    this is what keeps that entry honest rather than vacuous."""
+    html = "<svg><template>  a   b  </template></svg>"
+    assert "<template>  a   b  </template>" in canon(html)
+    assert canon(canon(html)) == canon(html)
+
+
 # ---- attribute-count short circuit --------------------------------------------------------
 @pytest.mark.parametrize(
     "html",

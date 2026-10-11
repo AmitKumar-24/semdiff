@@ -1,8 +1,11 @@
 """Dynamic-class rule family (T-13, FR-5): CSS-in-JS and CSS-modules hashes in ``class``.
 
-Each rule targets one generator so it can be toggled and reported on its own. Every rule
-strips matching whitespace-separated tokens from ``class`` only; static tokens keep their
-order. Patterns are calibrated on the T-04 captures (MUI, Ant Design, Docusaurus).
+Each rule targets one generator so it can be toggled and reported on its own. Every rule works
+on whitespace-separated tokens of ``class`` only, and replaces a matching token in place with
+``PLACEHOLDER`` (T-18, D-043) rather than dropping it: ``class="css-1abc2d kept"`` becomes
+``class="__semdiff__ kept"``. Static tokens keep their order and their position, and an element
+that was styled by a generated class still looks styled afterwards — DOMAIN_MODEL §10's reason
+for the action, since STRIP made ``<div class="css-1abc2d">`` and ``<div>`` normalize alike.
 """
 
 from __future__ import annotations
@@ -22,8 +25,9 @@ def _rule(rule_id: str, pattern: str) -> NormalizationRule:
         family=RuleFamily.DYNAMIC_CLASS,
         target=Target.ATTRIBUTE_VALUE,
         matcher=RegexMatcher(pattern),
-        action=Action.STRIP,
+        action=Action.REPLACE_WITH_PLACEHOLDER,
         phase=PHASE_DYNAMIC_CLASS,
+        version=2,  # v2: placeholder instead of STRIP (T-18)
         attributes=frozenset({"class"}),
     )
 

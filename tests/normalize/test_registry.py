@@ -205,10 +205,16 @@ def test_disabled_rules_do_not_fire() -> None:
 
 
 def test_unimplemented_or_misdeclared_actions_fail_loud() -> None:
+    """T-18 implemented REPLACE_WITH_PLACEHOLDER, so what must fail loud moved: the action is
+    meaningless for a NODE target (an element is dropped or kept), and that is now rejected when
+    the rule is registered rather than when it runs."""
     doc = parse(HTML)
-    placeholder = rule("test.future", action=Action.REPLACE_WITH_PLACEHOLDER, phase=90)
-    with pytest.raises(NotImplementedError, match="T-18"):
-        apply_rules(doc, make_registry(placeholder), NormalizationConfig())
+    node_placeholder = rule(
+        "test.future", action=Action.REPLACE_WITH_PLACEHOLDER, target=Target.NODE,
+        pattern=r"^aside$", attributes=frozenset(), phase=90,
+    )
+    with pytest.raises(ValueError, match="NODE"):
+        make_registry(node_placeholder)
     no_transform = rule("test.canon", action=Action.CANONICALIZE, family=RuleFamily.CANONICAL, phase=90)
     with pytest.raises(ValueError, match="transform"):
         apply_rules(doc, make_registry(no_transform), NormalizationConfig())
@@ -252,22 +258,47 @@ STAMP_RULE = rule(
 PROTECTED_HTML = {
     "script": b"<p>at STAMP</p><script>var t = 'STAMP';</script>",
     "style": b"<p>at STAMP</p><style>.a:after{content:'STAMP'}</style>",
-    "template": b"<p>at STAMP</p><template>STAMP</template>",
+    # A <template> in foreign content, because an HTML one has nothing a rule could reach:
+    # Lexbor keeps HTML template contents in a detached fragment (see the test below). Inside
+    # <svg> the name carries no special parsing rule, so the children are ordinary nodes a
+    # traversal does offer — which is where the "template" entry in the set earns its keep.
+    "template": b"<p>at STAMP</p><svg><template>STAMP</template></svg>",
 }
 
 
 @pytest.mark.parametrize("tag", ["script", "style", "template"])
 def test_text_rules_never_enter_a_protected_element(tag: str) -> None:
-    """<template> is protected twice over: Lexbor keeps its contents in a detached fragment, so a
-    traversal never offers them anyway. The tag stays in the set for the whitespace rule, which
-    reads it too, and for a second backend (T-11) that may well expose those nodes.
-    """
+    """Each case has a text node a traversal really does hand to the rule, and the rule must
+    decline all three while rewriting the ordinary ``<p>`` beside them."""
     result = apply_rules(parse(PROTECTED_HTML[tag]), make_registry(STAMP_RULE), NormalizationConfig())
     assert "STAMP" in (result.tree.css_first(tag).html or "")
     assert result.tree.css_first("p").text() == "at "
     assert [(a.rule_id, a.before, a.after) for a in result.applied_rules] == [
         ("test.text.stamp", "at STAMP", "at ")
     ]
+
+
+def test_an_html_templates_contents_are_unreachable_rather_than_protected() -> None:
+    """The honest limit of the case above, asserted as the parser property it is.
+
+    Lexbor puts the contents of an HTML ``<template>`` in a detached fragment: ``child`` is
+    ``None``, a CSS query inside it finds nothing, ``text()`` is empty and a traversal yields no
+    node for it. So a TEXT rule cannot reach that text whether or not the tag is protected, and
+    the content survives for the wrong reason. The tag stays in ``PROTECTED_TEXT_PARENTS``
+    because the foreign-content case above *is* reachable, because ``canonical.whitespace``
+    reads the same set, and because a second backend (T-11) may expose these nodes — on lxml
+    they are ordinary children. See F-031.
+    """
+    tree = LexborHTMLParser("<template><p>STAMP</p></template>")
+    assert tree.root is not None
+    template = tree.css_first("template")
+    assert template.child is None and template.text() == "" and tree.css("template p") == []
+    assert [n.tag for n in tree.root.traverse(include_text=True) if n.tag == "-text"] == []
+    assert "STAMP" in (template.html or "")  # serialization is the only way to it
+
+    result = apply_rules(parse(b"<template>STAMP</template>"), make_registry(STAMP_RULE), NormalizationConfig())
+    assert result.applied_rules == []  # nothing was offered, so nothing was declined
+    assert "STAMP" in (result.tree.css_first("template").html or "")
 
 
 def test_protection_covers_deep_and_foreign_content() -> None:

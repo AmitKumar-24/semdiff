@@ -2,6 +2,7 @@
 
 from semdiff.normalize.api import normalize
 from semdiff.normalize.model import (
+    PLACEHOLDER,
     Action,
     EntropyMatcher,
     GroupMatcher,
@@ -20,6 +21,7 @@ import semdiff.normalize.rules  # noqa: E402, F401  (registers the built-in fami
 
 __all__ = [
     "BUILTIN_RULES",
+    "PLACEHOLDER",
     "Action",
     "EntropyMatcher",
     "GroupMatcher",

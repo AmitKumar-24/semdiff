@@ -5,7 +5,15 @@ from __future__ import annotations
 import pytest
 
 from semdiff import NormalizationConfig, parse
-from semdiff.normalize import BUILTIN_RULES, EntropyMatcher, RuleFamily, Target, apply_rules
+from semdiff.normalize import (
+    BUILTIN_RULES,
+    PLACEHOLDER,
+    Action,
+    EntropyMatcher,
+    RuleFamily,
+    Target,
+    apply_rules,
+)
 from semdiff.normalize.rules.ids import ENTROPY_MIN_BITS, ENTROPY_MIN_LENGTH, ID_RULES
 
 BY_ID = {rule.id: rule for rule in ID_RULES}
@@ -31,6 +39,9 @@ NEGATIVE = [
     "documentation2024", "report-documentation2024",
     # hex-looking words and letters-only strings
     "item-decade", "card-facade", "abcdefghijklmnop", "nav-beaded",
+    # a hash-shaped run that does not end the value: the hash must be the whole trailing
+    # segment, or T-18's in-place replacement would eat a chunk out of a meaningful id.
+    "tab-1a2b3cxyz", "v2-1a2b3c-label", "section-7a3b2c-summary",
 ]
 
 
@@ -62,10 +73,17 @@ def test_family_is_registered_with_stable_ids_and_phase() -> None:
     ids = [rule.id for rule in BUILTIN_RULES.ordered() if rule.family is RuleFamily.HASHED_ID]
     assert ids == sorted(BY_ID) == ["id.entropy", "id.hex_suffix", "id.react_use_id"]
     assert {rule.phase for rule in ID_RULES} == {20}
-    assert all(rule.target is Target.ATTRIBUTE and rule.attributes == frozenset({"id"}) for rule in ID_RULES)
+    # T-18: the matched span is replaced in place so the attribute survives, and the rules now
+    # also run over the attributes that reference an id (F-006).
+    assert all(rule.target is Target.ATTRIBUTE_SUBSTRING for rule in ID_RULES)
+    assert all(rule.action is Action.REPLACE_WITH_PLACEHOLDER for rule in ID_RULES)
+    assert all(rule.version == 2 for rule in ID_RULES)
+    assert all({"id", "for", "headers", "aria-labelledby"} <= rule.attributes for rule in ID_RULES)
+    assert "href" in BY_ID["id.hex_suffix"].attributes  # fragments only; the pattern fences it
+    assert "href" not in BY_ID["id.entropy"].attributes  # cannot be fenced to a fragment (F-029)
 
 
-def test_end_to_end_strips_only_hashed_ids() -> None:
+def test_end_to_end_placeholders_only_hashed_ids() -> None:
     doc = parse(
         b'<main id="main"><div id="react-root-7a3b2c" class="react-root-7a3b2c" data-id="react-root-7a3b2c">'
         b'<label id="_R_lql3aqll6_" for="_R_lql3aqll6_">x</label>'
@@ -74,17 +92,23 @@ def test_end_to_end_strips_only_hashed_ids() -> None:
     result = apply_rules(doc, BUILTIN_RULES, NormalizationConfig())
     assert result.tree.css_first("main").attributes["id"] == "main"
     div = result.tree.css_first("div")
-    assert "id" not in div.attributes
+    assert div.attributes["id"] == "react-root-__semdiff__"  # T-18: the prefix survives with it
     assert div.attributes["class"] == "react-root-7a3b2c"  # class is not this family's business
     assert div.attributes["data-id"] == "react-root-7a3b2c"
     label = result.tree.css_first("label")
-    assert "id" not in label.attributes
-    assert label.attributes["for"] == "_R_lql3aqll6_"  # references are out of scope for T-14
+    # F-006 closed: the id and the for pointing at it are rewritten to the same text, so the
+    # reference still resolves. No mapping is kept anywhere — the sentinel is a constant.
+    assert label.attributes["id"] == PLACEHOLDER
+    assert label.attributes["for"] == PLACEHOLDER
     span = result.tree.css_first("span")
     assert span.attributes["itemid"] == "react-root-7a3b2c"
     assert span.attributes["id"] == "product-card"
     fired = [(a.rule_id, a.before, a.after) for a in result.applied_rules if a.rule_id.startswith("id.")]
-    assert fired == [("id.hex_suffix", "react-root-7a3b2c", ""), ("id.react_use_id", "_R_lql3aqll6_", "")]
+    assert fired == [
+        ("id.hex_suffix", "react-root-7a3b2c", "react-root-__semdiff__"),
+        ("id.react_use_id", "_R_lql3aqll6_", PLACEHOLDER),  # the id
+        ("id.react_use_id", "_R_lql3aqll6_", PLACEHOLDER),  # and the for referencing it
+    ]
     assert (result.applied_rules[0].locator.css or "").endswith("> main > div")
 
 
@@ -94,7 +118,8 @@ def test_each_rule_is_individually_toggleable(rule_id: str) -> None:
     doc = parse(f'<p id="{value}">x</p>'.encode())
     off = NormalizationConfig(disabled_rules=frozenset({rule_id}))
     assert apply_rules(doc, BUILTIN_RULES, off).tree.css_first("p").attributes["id"] == value
-    assert "id" not in apply_rules(doc, BUILTIN_RULES, NormalizationConfig()).tree.css_first("p").attributes
+    on = apply_rules(doc, BUILTIN_RULES, NormalizationConfig()).tree.css_first("p").attributes["id"]
+    assert on is not None and on != value and PLACEHOLDER in on  # attribute stays, hash does not
 
 
 def test_input_tree_not_mutated_and_output_deterministic() -> None:
@@ -104,5 +129,5 @@ def test_input_tree_not_mutated_and_output_deterministic() -> None:
     second = apply_rules(doc, BUILTIN_RULES, NormalizationConfig())
     assert doc.tree.html == before
     assert first.tree.html == second.tree.html
-    assert "id" not in first.tree.css_first("div").attributes
-    assert "id" not in first.tree.css_first("p").attributes
+    assert first.tree.css_first("div").attributes["id"] == PLACEHOLDER
+    assert first.tree.css_first("p").attributes["id"] == PLACEHOLDER

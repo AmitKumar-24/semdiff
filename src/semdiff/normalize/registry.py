@@ -17,6 +17,7 @@ from selectolax.lexbor import LexborHTMLParser, LexborNode
 from semdiff.config import NormalizationConfig
 from semdiff.locator import Locator
 from semdiff.normalize.model import (
+    PLACEHOLDER,
     Action,
     NormalizationRule,
     NormalizedDoc,
@@ -41,6 +42,11 @@ class RuleRegistry:
     def register(self, rule: NormalizationRule) -> None:
         if rule.id in self._rules:
             raise ValueError(f"duplicate rule id {rule.id!r}")
+        if rule.action is Action.REPLACE_WITH_PLACEHOLDER and rule.target is Target.NODE:
+            raise ValueError(
+                f"rule {rule.id!r}: REPLACE_WITH_PLACEHOLDER has no meaning for a NODE target; "
+                "an element is dropped (DROP_NODE) or kept"
+            )
         self._rules[rule.id] = rule
         try:
             self._check_phases()
@@ -97,10 +103,7 @@ def apply_rules(doc: ParsedDoc, registry: RuleRegistry, config: NormalizationCon
 def _fusable(rule: NormalizationRule) -> bool:
     """Whether the fused pass can run ``rule``: exactly the rules ``_apply`` hands to
     ``_apply_attributes``."""
-    return rule.target in _FUSABLE_TARGETS and rule.action not in (
-        Action.CANONICALIZE,
-        Action.REPLACE_WITH_PLACEHOLDER,
-    )
+    return rule.target in _FUSABLE_TARGETS and rule.action is not Action.CANONICALIZE
 
 
 def _runs(rules: list[NormalizationRule]) -> list[list[NormalizationRule]]:
@@ -171,8 +174,6 @@ def _apply(rule: NormalizationRule, tree: LexborHTMLParser) -> Iterable[RuleAppl
         if rule.transform is None:
             raise ValueError(f"rule {rule.id!r} is CANONICALIZE but has no transform")
         return rule.transform(rule, tree)
-    if rule.action is Action.REPLACE_WITH_PLACEHOLDER:
-        raise NotImplementedError("REPLACE_WITH_PLACEHOLDER arrives with T-18")
     nodes = list(tree.root.traverse(include_text=True)) if tree.root is not None else []
     if rule.target is Target.TEXT:
         protected = _protected_text_nodes(tree)
@@ -191,7 +192,10 @@ def _apply_text(rule: NormalizationRule, node: LexborNode) -> list[RuleApplicati
     before = node.text_content or ""
     if not rule.matcher.matches(before):
         return []
-    after = rule.matcher.sub(before, "")
+    replacement = _replacement(rule)
+    after = rule.matcher.sub(before, replacement)
+    if replacement and after == before:
+        return []  # already the sentinel: a second pass must change nothing (idempotence)
     locator = Locator.for_node(node)
     node.replace_with(after)
     return [RuleApplication(rule.id, locator, before, after)]
@@ -226,38 +230,53 @@ def _apply_node(rule: NormalizationRule, node: LexborNode) -> list[RuleApplicati
     return [RuleApplication(rule.id, locator, before, "")]
 
 
+def _replacement(rule: NormalizationRule) -> str:
+    """What takes the place of a match: nothing for STRIP, the sentinel for the placeholder."""
+    return PLACEHOLDER if rule.action is Action.REPLACE_WITH_PLACEHOLDER else ""
+
+
 def _apply_attributes(rule: NormalizationRule, node: LexborNode) -> list[RuleApplication]:
+    """One attribute rule against one element. The two actions differ only in what replaces the
+    match, and in whether an attribute whose whole value matched survives (T-18)."""
     out: list[RuleApplication] = []
     if rule.where is not None and not rule.where.matches(node):
         return out
+    replacement = _replacement(rule)
     for name, value in sorted(node.attributes.items()):
         if name in PROTECTED_ATTRIBUTES or (rule.attributes and name not in rule.attributes):
             continue
         before = value or ""
+        if replacement and not before:
+            continue  # a boolean attribute carries no value; giving it one would invent meaning
         if rule.target is Target.ATTRIBUTE:
             if not rule.matcher.matches(before):
                 continue
-            locator = Locator.for_node(node)
-            del node.attrs[name]
-            out.append(RuleApplication(rule.id, locator, before, ""))
+            after = replacement
+            if replacement and after == before:
+                continue  # already the sentinel: a second pass reports nothing (idempotence)
         elif rule.target is Target.ATTRIBUTE_SUBSTRING:  # rewrite in place; the attribute stays
             if not rule.matcher.matches(before):
                 continue
-            after = rule.matcher.sub(before, "")
+            after = rule.matcher.sub(before, replacement)
             if after == before:
                 continue
-            locator = Locator.for_node(node)
-            node.attrs[name] = after
-            out.append(RuleApplication(rule.id, locator, before, after))
+        elif replacement:  # ATTRIBUTE_VALUE: the matching token becomes the sentinel, in place
+            tokens = before.split()
+            matched = [rule.matcher.matches(t) for t in tokens]
+            if not any(matched):
+                continue  # rebuilding would renormalize the value's whitespace and report that
+            after = " ".join(replacement if hit else t for t, hit in zip(tokens, matched))
+            if after == before:
+                continue
         else:  # ATTRIBUTE_VALUE: strip matching whitespace-separated tokens
             kept = [t for t in before.split() if not rule.matcher.matches(t)]
             after = " ".join(kept)
             if after == before or len(kept) == len(before.split()):
                 continue
-            locator = Locator.for_node(node)
-            if after:
-                node.attrs[name] = after
-            else:
-                del node.attrs[name]  # STRIP loses attribute presence; T-18's placeholder keeps it
-            out.append(RuleApplication(rule.id, locator, before, after))
+        locator = Locator.for_node(node)
+        if after == "" and rule.target is not Target.ATTRIBUTE_SUBSTRING:
+            del node.attrs[name]  # STRIP loses attribute presence; the placeholder keeps it (T-18)
+        else:
+            node.attrs[name] = after
+        out.append(RuleApplication(rule.id, locator, before, after))
     return out

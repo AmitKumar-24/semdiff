@@ -241,7 +241,9 @@ def test_earlier_families_are_unaffected() -> None:
         '<script src="/assets/js/main.3eef80bd.js"></script></div>'
     )
     out = normalize(html)
-    assert 'class="card"' in out and "react-root" not in out
+    # T-18: the class and the id survive as the sentinel; what was hashed is gone either way.
+    assert 'class="card __semdiff__"' in out and 'id="react-root-__semdiff__"' in out
+    assert "css-1dbjc4n" not in out and "7a3b2c" not in out
     assert "Zm9vYmFyMTIzNDU2Nzg5" not in out and "3 minutes ago" not in out
     assert '/assets/js/main.js' in out
 

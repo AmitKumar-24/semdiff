@@ -53,21 +53,23 @@ def test_family_is_registered_with_stable_ids_and_phase() -> None:
     assert all(rule.enabled for rule in CLASS_RULES)
 
 
-def test_end_to_end_strip_preserves_static_tokens_and_order() -> None:
+def test_end_to_end_placeholder_preserves_static_tokens_and_order() -> None:
     doc = parse(
         b'<div class="MuiBox-root css-1p1nqj6 markdown-body categoryLinkLabel_O4bj">'
         b'<p id="css-1p1nqj6" class="css-9zz9zz">x</p><span itemprop="css-1p1nqj6" class="kept">y</span></div>'
     )
     result = apply_rules(doc, BUILTIN_RULES, NormalizationConfig())
-    assert result.tree.css_first("div").attributes["class"] == "MuiBox-root markdown-body"
-    assert "class" not in result.tree.css_first("p").attributes  # every token stripped → attribute gone
+    # T-18: a matching token becomes the sentinel in place, so position, order and the
+    # attribute itself survive — <div class="css-1abc2d"> no longer normalizes to <div>.
+    assert result.tree.css_first("div").attributes["class"] == "MuiBox-root __semdiff__ markdown-body __semdiff__"
+    assert result.tree.css_first("p").attributes["class"] == "__semdiff__"
     assert result.tree.css_first("p").attributes["id"] == "css-1p1nqj6"  # not a class: untouched by T-13
     assert result.tree.css_first("span").attributes["itemprop"] == "css-1p1nqj6"
     fired = [(a.rule_id, a.before, a.after) for a in result.applied_rules if a.rule_id.startswith("class.")]
     assert fired == [
-        ("class.css_modules", "MuiBox-root css-1p1nqj6 markdown-body categoryLinkLabel_O4bj", "MuiBox-root css-1p1nqj6 markdown-body"),
-        ("class.emotion", "MuiBox-root css-1p1nqj6 markdown-body", "MuiBox-root markdown-body"),
-        ("class.emotion", "css-9zz9zz", ""),
+        ("class.css_modules", "MuiBox-root css-1p1nqj6 markdown-body categoryLinkLabel_O4bj", "MuiBox-root css-1p1nqj6 markdown-body __semdiff__"),
+        ("class.emotion", "MuiBox-root css-1p1nqj6 markdown-body __semdiff__", "MuiBox-root __semdiff__ markdown-body __semdiff__"),
+        ("class.emotion", "css-9zz9zz", "__semdiff__"),
     ]
 
 
@@ -77,7 +79,7 @@ def test_each_rule_is_individually_toggleable(rule_id: str) -> None:
     doc = parse(f'<p class="{token} static">x</p>'.encode())
     off = NormalizationConfig(disabled_rules=frozenset({rule_id}))
     assert apply_rules(doc, BUILTIN_RULES, off).tree.css_first("p").attributes["class"] == f"{token} static"
-    assert apply_rules(doc, BUILTIN_RULES, NormalizationConfig()).tree.css_first("p").attributes["class"] == "static"
+    assert apply_rules(doc, BUILTIN_RULES, NormalizationConfig()).tree.css_first("p").attributes["class"] == "__semdiff__ static"
 
 
 def test_input_tree_not_mutated_and_output_deterministic() -> None:
@@ -87,6 +89,6 @@ def test_input_tree_not_mutated_and_output_deterministic() -> None:
     second = apply_rules(doc, BUILTIN_RULES, NormalizationConfig())
     assert doc.tree.html == before
     assert first.tree.html == second.tree.html
-    assert first.tree.css_first("div").attributes["class"] == "a"
-    assert first.tree.css_first("p").attributes["class"] == "b"
+    assert first.tree.css_first("div").attributes["class"] == "__semdiff__ a"
+    assert first.tree.css_first("p").attributes["class"] == "__semdiff__ __semdiff__ b"
 

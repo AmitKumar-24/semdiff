@@ -15,6 +15,15 @@ from selectolax.lexbor import LexborHTMLParser, LexborNode
 from semdiff.locator import Locator
 
 
+# T-18, D-043: what REPLACE_WITH_PLACEHOLDER puts where the matched noise was. One constant for
+# every family, and that is the whole mechanism behind reference preservation (F-006): an ``id``
+# and the ``for`` pointing at it are rewritten by the same rule to the same text, so the reference
+# still resolves without the engine tracking a document-wide mapping. It must never be derived
+# from a counter or from a node's position -- an unrelated insertion in one snapshot would then
+# shift every later placeholder and manufacture a difference out of nothing.
+PLACEHOLDER = "__semdiff__"
+
+
 class RuleFamily(StrEnum):
     DYNAMIC_CLASS = "dynamic_class"
     HASHED_ID = "hashed_id"
