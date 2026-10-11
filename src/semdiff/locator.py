@@ -12,7 +12,7 @@ from selectolax.lexbor import LexborNode
 class Locator:
     xpath: str | None
     css: str | None
-    node_hash: str  # survives reordering; a positional path does not
+    node_hash: str  # the node itself, not its subtree (D-044); survives reordering
 
     @classmethod
     def for_node(cls, node: LexborNode) -> Locator:
@@ -39,5 +39,22 @@ def _css_path(node: LexborNode) -> str:
 
 
 def _node_hash(node: LexborNode) -> str:
-    raw = node.text_content if node.tag == "-text" else (node.html or "")
-    return hashlib.sha256((raw or "").encode("utf-8")).hexdigest()
+    """Fingerprint of the node *itself* — never of its descendants (D-044, F-030).
+
+    Hashing ``node.html`` made provenance order-dependent: the same rewrite of the same
+    attribute recorded a different hash depending on whether a descendant had already been
+    rewritten, which differs between one traversal per rule and the fused attribute pass. A
+    locator points at a node, so its fingerprint is a property of that node: the tag and
+    attributes of an element, the content of a text or comment node. It still survives the node
+    moving, and it still changes when the node itself changes.
+    """
+    if node.tag == "-text":
+        raw = node.text_content or ""
+    elif node.is_element_node:
+        # ``repr`` of the tag and the sorted (name, value) pairs: deterministic, and quoted, so
+        # two different attribute sets cannot collide the way a flat join would. A boolean
+        # attribute hashes like an empty one, as the canonical serializer unifies them (D-032).
+        raw = repr((node.tag or "", sorted((n, v or "") for n, v in node.attributes.items())))
+    else:
+        raw = node.html or ""  # a comment or doctype has no children to pull in
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()

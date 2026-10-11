@@ -421,6 +421,33 @@ def test_a_dropped_node_is_never_offered_to_a_later_attribute_rule() -> None:
     assert [len(run) for run in _runs(registry.effective(NormalizationConfig()))] == [1, 1, 1]
 
 
+def test_nested_elements_get_the_same_provenance_from_either_engine() -> None:
+    """F-030, closed by D-044. The fused pass visits a node once; one pass per rule finishes each
+    rule over the whole document first. So when a descendant is rewritten by an *earlier* rule of
+    the same run, the two engines meet the ancestor with its subtree in different states — which
+    used to change the ancestor's ``node_hash``, because that hashed the subtree. The fingerprint
+    is the node's own now, so every record matches, locator included.
+    """
+    inner = rule("test.nest.inner", pattern=r"^inner-[a-z]{5}$", phase=10)
+    outer = rule("test.nest.outer", pattern=r"^outer-[a-z]{5}$", phase=11)
+    registry = make_registry(inner, outer)
+    assert [len(run) for run in _runs(registry.effective(NormalizationConfig()))] == [2]  # fused
+    html = (
+        b'<div class="outer-aaaaa keep">'
+        b'<p class="inner-bbbbb keep"><span class="outer-ccccc">x</span></p>'
+        b"</div>"
+    )
+    doc = parse(html)
+    fused = apply_rules(doc, registry, NormalizationConfig())
+    per_rule = apply_rules_per_rule(doc, registry, NormalizationConfig())
+    assert records(fused) == records(per_rule)
+    assert [(a.rule_id, a.before, a.after) for a in fused.applied_rules] == [
+        ("test.nest.inner", "inner-bbbbb keep", "keep"),
+        ("test.nest.outer", "outer-aaaaa keep", "keep"),
+        ("test.nest.outer", "outer-ccccc", ""),
+    ]
+
+
 def test_runs_partition_the_ruleset_without_reordering_it() -> None:
     rules = BUILTIN_RULES.effective(NormalizationConfig())
     runs = _runs(rules)

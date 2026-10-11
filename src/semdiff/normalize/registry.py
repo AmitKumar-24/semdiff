@@ -138,8 +138,11 @@ def _apply_attribute_rules(
     Equivalence with one pass per rule rests on attribute rules being node-local: each touches
     only the node it is handed, never a sibling, an ancestor or the shape of the tree. So per
     element the rules still see each other's work in ``(phase, id)`` order, which is the only
-    order in which they can interact. Reporting stays rule-major: each application is collected
-    with its rule's position and the document order it was made in, then sorted back.
+    order in which they can interact. The provenance is node-local for the same reason, but only
+    since D-044: while ``node_hash`` covered a node's whole subtree, the two execution orders
+    could record different hashes for the same rewrite (F-030). Reporting stays rule-major: each
+    application is collected with its rule's position and the document order it was made in,
+    then sorted back.
     """
     if tree.root is None:
         return []

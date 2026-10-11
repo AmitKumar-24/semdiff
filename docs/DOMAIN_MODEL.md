@@ -208,10 +208,12 @@ class Provenance:
 class Locator:
     xpath: str | None
     css: str | None
-    node_hash: str                   # survives reordering; XPath does not
+    node_hash: str                   # the node itself, not its subtree; survives reordering
 ```
 
 `node_hash` exists because XPath is positional and a diff whose provenance breaks on an inserted ad slot is not provenance. Recording the normalization rules that touched a subtree is what makes a null result explainable, per the observability requirement.
+
+It fingerprints the node *itself* — an element's tag and attributes, a text or comment node's content — and deliberately not its subtree (D-044). A fingerprint covering descendants changed whenever an unrelated child was rewritten, which made the recorded value depend on the order rules happened to run in: one traversal per rule and a fused pass disagree about how much of a subtree is already rewritten when a locator is taken (F-030). Two identical elements in different places therefore share a hash. That is the point of it — it identifies a node by what it is, so it survives the node moving — and `css` is what says where.
 
 ## 8. Normalization rule model
 
