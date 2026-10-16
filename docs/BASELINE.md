@@ -170,11 +170,59 @@ designed rather than a list quietly going stale. The rule was written against th
 hashes observed across the capture rounds and the non-hash segments standing in the same
 position; it was not tuned to these two fixtures, and no fixture was edited.
 
+## Recall: synthetic mutations (T-24)
+
+This table measures one direction only — what the tools report on pages that did not change.
+The other direction has its own gate, `tests/corpus/test_recall_gate.py`, and it is measured
+differently, so the two kinds of evidence must not be read as one.
+
+**What it does.** The same twenty captures are mutated **in memory**, one surgical edit at a
+time: a word of paragraph, heading or list text; a link target; an image filename; a visible
+version string; an attribute removed; an attribute value changed; a class token renamed; a
+paragraph added or removed; an ASCII space turned into a non-breaking one; an id reference
+re-pointed. Each must come through `normalize()` *as itself* — the edited literal appears
+exactly one more time in the output than it does for the unmutated document, or one fewer where
+something was deleted.
+
+Alongside them run noise controls on the same documents — a class hash, an asset hash and a
+timestamp rotated, whitespace re-indented, attributes reordered, a comment inserted — which
+must still normalize byte-identically, and whose rotated hash must be absent from the output so
+a control cannot pass by being inert.
+
+**Result: 277 cases — 179 recall, 98 control, across 19 classes — all green.** No mutation
+class is erased on any document it applies to. Four controlled mutants, each installed in the
+working tree and reverted, show the gate is not vacuous:
+
+| mutant | effect |
+|---|---|
+| F-010 restored: `_WS = \s+`, collapsing Unicode whitespace so `a&nbsp;b` and `a b` normalize alike | exactly the **20 NBSP cases** fail, nothing else |
+| whitespace collapse disabled entirely | all **20 re-indent controls** fail, plus 6 paragraph-removal cases whose expected literal is the collapsed text |
+| `canonical.attr_order` stops reordering | all **20 attribute-reorder controls** fail |
+| `class.emotion` widened to match any token | all **20 class-rename cases** fail |
+
+The first is the one that matters: F-010 is a false negative that actually shipped, and it was
+found by reading a regex rather than by a test. Two of the others shaped the catalogue rather
+than merely confirming it. The class mutant left every recall case green until a class-rename
+case was added — FR-5 is explicit that a page which stops emitting a generated class must not
+look unchanged, and nothing had been testing it. The whitespace mutant reached only 12 of the 20
+re-indent controls until those controls were moved inside `<body>`: the tree builder discards
+whitespace-only text in `<head>`, so a run there is erased by the parser rather than by the rule,
+and the control passed for the wrong reason.
+
+**What it is not.** These are synthetic edits to real captures, not independently captured real
+changes. That distinction is the point of D-045: a mutation is chosen by a test author, so it
+can only show that normalization preserves changes it was never designed to erase — it cannot
+show how it behaves on the changes a real deploy happens to make. Two rows carry their own
+caveats: the visible-version case is provisional pending Q-26 (whether a build-identity stamp
+is noise at all), and a reference re-pointed between two *hash-shaped* values is invisible by
+design (F-029), pinned as a limit in the unit tests rather than asserted here as recall.
+
 ## What this benchmark does not measure
 
-- **Recall.** Every pair here is noise-only, so this measures false positives and nothing else.
-  It says nothing about whether SemDiff detects real changes; that is NFR-5's job, on pairs
-  that do not exist yet.
+- **Recall against real captured changes.** Every pair here is noise-only, so this table
+  measures false positives and nothing else. T-24 answers the recall question with *synthetic*
+  mutations (the section above); a corpus of real captured change pairs is still NFR-5's job, on
+  pairs that do not exist yet.
 - **Four of the seven noise families.** The corpus is 14 `asset_hash` and 6 `timestamp` pairs.
   Real captures offered no `dynamic_class`, `hashed_id` or `token` churn at all (F-019, F-022,
   F-023), so FR-5, FR-6 and FR-7 have no real-world coverage here — only synthetic unit tests.

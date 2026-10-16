@@ -50,6 +50,10 @@ change disqualifies the pair.
 
 This rule is deliberately not defined in terms of SemDiff's own normalization rules.
 
+Fixtures are read-only evidence. T-24's recall gate mutates these captures **in memory only**
+(`tests/corpus/mutations.py`, D-045); no test writes to `corpus/`, and
+`test_no_fixture_was_modified` re-hashes every file here to keep it that way.
+
 ## Admission limits and recorded rejections
 
 At most **six fixtures per host**, so that no single site or page generator can dominate the

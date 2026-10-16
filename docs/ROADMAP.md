@@ -57,6 +57,13 @@ The smallest useful release. No diffing at all.
 | T-20 | CLI `semdiff normalize file.html` | T-19 | Round-trips a file, `--report` lists fired rules |
 | T-21 | **Gate:** noise-only corpus → normalized outputs byte-identical | T-19, T-23, T-04 | All 20 pairs identical after normalization |
 | T-22 | Baseline comparison: same 20 pairs through `lxml.html.diff` and `difflib` | T-21 | Published table of their change counts vs SemDiff's 0/20 |
+| T-24 | **Gate:** recall — meaningful changes survive normalization, on the same 20 corpus documents | T-19, T-21, T-04 | Every mutation class is visible after `normalize()` on every document it applies to, and every noise control still normalizes identically |
+
+T-24 is T-21's other half. T-21 proves normalization stays quiet on twenty unchanged pages;
+T-24 proves it still speaks when something real changes, by mutating those same captures in
+memory — one surgical edit per case — and asserting the edit survives *as itself*. The
+mutations are synthetic, which `docs/BASELINE.md` states plainly: they are not a substitute for
+a captured real-change corpus (NFR-5), which does not exist yet.
 
 **Release v0.1.** T-22 is the marketing asset, not an afterthought — "here are 20 real page pairs that did not change, where a raw diff flags all 20 and this flags none" is the entire pitch. Measured, not asserted: `docs/BASELINE.md`. The claim is a false-positive rate, not a change volume — the baselines report one to three changes per pair, not hundreds (F-028). Publish the runtime column with it: SemDiff is ~3x slower than `lxml.html.diff` on the same pairs (~5x before the normalization-overhead work; NFR-3's 100 ms is still not met). Post it where changedetection.io and urlwatch users are.
 
