@@ -96,6 +96,74 @@ Exit codes: `0` success, `2` bad command line, `3` parse error, `4` input too la
 - **Safe.** Input is untrusted: parse-only, no script execution, no external entity
   resolution, no outbound requests.
 
+## Limitations
+
+What SemDiff does not do, stated plainly: the failure modes a library leaves undocumented are
+the ones that cost it trust. Each item names the evidence behind it — `FINDINGS.md` for the
+observations, `docs/DECISIONS.md` for the decisions that accepted them.
+
+### Not implemented
+
+- **One parser backend.** `parser="lxml"` raises `NotImplementedError`. selectolax (Lexbor) is
+  the only backend; the lxml adapter is T-11 and has not been built.
+- **Rules are toggleable, not extensible.** Any shipped rule can be turned off or on through
+  config, but no config field adds one. A custom rule means reaching past the public API into
+  the registry, which is not a supported surface yet.
+- **`normalize()` does not report what it changed.** It returns a string and nothing else. The
+  rules that fired come from `apply_rules()`, or on stderr from `semdiff normalize --report`.
+- **Slower than the 100 ms per-pair target.** The published benchmark measures a median of
+  373 ms per pair against 125 ms for `lxml.html.diff` — about 3x, bought for twenty fewer false
+  positives. The numbers, the machine and the method are in `docs/BASELINE.md`.
+
+### What normalization cannot reach
+
+- **Hashes that live in attribute names.** Every rule target addresses an attribute's value, a
+  node or text; none addresses a name. Vue SFC scoped-style markers (`data-v-b483c686`)
+  therefore survive, and they rebuild on every deploy (F-022).
+- **Anything inside a protected carrier.** Text in `<script>` and `<style>` is never touched,
+  which is what keeps JSON-LD and other structured data trustworthy (D-029). The cost: a
+  streamed React Server Component payload whose chunk boundaries shift between deploys reads as
+  a change that no rule can remove (F-015).
+- **The contents of an HTML `<template>`.** Lexbor keeps them in a detached fragment, so no
+  rule reaches them on the selectolax backend — they survive because they are unreachable, not
+  because they are declined (F-031).
+- **Stamps that name the build itself.** A nightly version string in body text, or ant.design's
+  `<meta name="build-time">` and `<meta name="build-hash">`, is left alone. Whether a
+  build-identity string is noise at all is still an open question (Q-26, F-014).
+- **A human datetime whose clock time is not parenthesised.** `Sep 25, 2026 (15:12 UTC)` is
+  neutralized; `Sep 25, 2026 at 15:12 UTC` and `2026/09/25 15:12 UTC` are not. The parentheses
+  are doing real work as a false-positive fence, so widening the pattern needs its own
+  calibration against negative cases (F-020).
+
+### Accepted recall costs
+
+Each of these costs recall and never precision — both snapshots collapse the same way, so none
+of them can invent a change — and each was accepted rather than engineered around.
+
+- **Two hashes with no stable prefix collide.** Both become `__semdiff__`, so a reference
+  re-pointed from `_R_aaa_` to `_R_bbb_` is invisible. A stable prefix is what keeps the common
+  cases apart: `tab-__semdiff__` and `panel-__semdiff__` still differ (F-029).
+- **`id.entropy` does not reach inside an `href`.** It scores the longest alphanumeric run of a
+  whole attribute value and cannot be fenced to the fragment after `#`, so an entropic id is
+  rewritten in `id=` and `for=` and left alone in `href="#…"` (F-029).
+- **`token.session_input` strips encoded hidden-input payloads.** A compressed payload in a
+  hidden input has the same shape as a session token — ant.design's CodeSandbox demo sources
+  are stripped as tokens. If you depend on hidden-input values, disable the rule (F-007).
+
+### Where the evidence is thin
+
+- **Three noise families have no real-world coverage.** The corpus is 14 `asset_hash` and
+  6 `timestamp` pairs. Real captures offered no `dynamic_class`, `hashed_id` or `token` churn to
+  admit, so those three families rest on unit tests alone (F-019, F-023, F-026).
+- **Recall is gated on synthetic mutations.** The gate edits those same twenty captures in
+  memory, one surgical change at a time, and asserts each edit survives normalization as
+  itself. It cannot show how normalization behaves on the changes a real deploy happens to
+  make; a corpus of captured real changes does not exist yet (D-045).
+- **Determinism is qualified by the parser build.** Same input, same `config_hash`, same parser
+  build, same output. Normalized output is identical across the selectolax versions CI covers,
+  but a `Locator.node_hash` on foreign content is not: 464 of 23,204 application records differ
+  between the 0.4 and 1.0 lines (D-046).
+
 ## Install
 
 ```
