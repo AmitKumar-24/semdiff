@@ -10,6 +10,7 @@ from __future__ import annotations
 import codecs
 import re
 from dataclasses import dataclass
+from importlib.metadata import PackageNotFoundError, version
 
 from selectolax.lexbor import LexborHTMLParser
 
@@ -17,6 +18,31 @@ from semdiff.config import Config, ParserBackend
 from semdiff.errors import InputTooLargeError, ParseError
 
 PARSER_ID = "selectolax"
+
+
+def _installed_version() -> str:
+    try:
+        return version(PARSER_ID)
+    except PackageNotFoundError:  # a vendored or zipped install has no distribution metadata
+        return "unknown"
+
+
+PARSER_VERSION = _installed_version()
+
+
+def parser_fingerprint() -> str:
+    """``selectolax/1.0.0`` — the parser build that produced a result (D-046).
+
+    ``config_hash`` deliberately does not cover this: the parser is a property of the
+    environment rather than of the configuration, and folding it in would change every
+    published hash whenever an upstream release lands. So the determinism contract reads
+    "same input, same ``config_hash``, **same parser build**", and this is how a caller
+    records the third term. Normalized output is identical across the versions CI covers;
+    what does move between them is a ``Locator.node_hash`` on foreign content (F-027).
+    """
+    return f"{PARSER_ID}/{PARSER_VERSION}"
+
+
 _PRESCAN_BYTES = 2048  # HTML spec "prescan a byte stream" looks at the first 1024+; be generous
 _META_CHARSET = re.compile(rb"""<meta[^>]*charset\s*=\s*["']?\s*([A-Za-z0-9_.:-]+)""", re.IGNORECASE)
 _BOMS = ((codecs.BOM_UTF8, "utf-8-sig"), (codecs.BOM_UTF16_LE, "utf-16"), (codecs.BOM_UTF16_BE, "utf-16"))
@@ -24,12 +50,18 @@ _BOMS = ((codecs.BOM_UTF8, "utf-8-sig"), (codecs.BOM_UTF16_LE, "utf-16"), (codec
 
 @dataclass(frozen=True)
 class ParsedDoc:
-    """DOMAIN_MODEL §2: ``(tree, encoding, parser_id, url)``."""
+    """DOMAIN_MODEL §2: ``(tree, encoding, parser_id, url)``, plus the parser's version.
+
+    ``parser_version`` is additive and defaulted (D-046): ``parser_id`` keeps its existing
+    value, so nothing that reads it today changes, and provenance can still name the exact
+    build.
+    """
 
     tree: LexborHTMLParser
     encoding: str
     parser_id: str
     url: str | None
+    parser_version: str = PARSER_VERSION
 
 
 def parse(
@@ -56,7 +88,13 @@ def parse(
 
     if not text.strip():
         raise ParseError("input is empty")
-    return ParsedDoc(tree=LexborHTMLParser(text), encoding=used, parser_id=PARSER_ID, url=url)
+    return ParsedDoc(
+        tree=LexborHTMLParser(text),
+        encoding=used,
+        parser_id=PARSER_ID,
+        url=url,
+        parser_version=PARSER_VERSION,
+    )
 
 
 def _resolve_encoding(data: bytes, declared: str | None) -> str:

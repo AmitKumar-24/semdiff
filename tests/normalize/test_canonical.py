@@ -2,11 +2,18 @@
 
 from __future__ import annotations
 
+from typing import cast
+
 import pytest
+from selectolax.lexbor import LexborNode
 
 from semdiff import NormalizationConfig, parse
 from semdiff.normalize import BUILTIN_RULES, Action, RuleFamily, apply_rules
-from semdiff.normalize.rules.canonical import CANONICAL_RULES, PHASE_CANONICAL
+from semdiff.normalize.rules.canonical import (
+    CANONICAL_RULES,
+    PHASE_CANONICAL,
+    _serialized_names,
+)
 
 BY_ID = {rule.id: rule for rule in CANONICAL_RULES}
 
@@ -283,3 +290,28 @@ def test_short_circuit_does_not_change_a_mixed_document() -> None:
     out = canon(html)
     assert '<a href="/x" id="l">' in out and '<span class="c" id="s">' in out
     assert canon(out) == out
+
+
+def test_attribute_sorting_tolerates_either_foreign_content_key_spelling() -> None:
+    """F-027, T-25: ``node.attributes`` spells a spec-adjusted key as the parser version sees
+    fit — ``viewbox`` on selectolax 0.4.x, ``viewBox`` on 1.0.0. The guard deciding whether the
+    start tag can be trusted compares case-insensitively on both sides, so the rule keeps
+    working either way; comparing case-sensitively switched it off for every ``<svg>`` on
+    1.0.0. Only one spelling can exist in a given process, so both go to ``_serialized_names``
+    directly.
+    """
+
+    class _Node:
+        """The two attributes ``_serialized_names`` reads."""
+
+        def __init__(self, attributes: dict[str, str]) -> None:
+            self.attributes = attributes
+            self.html = '<svg width="18" viewBox="0 0 16 16" fill="none">'
+
+    expected = ["width", "viewBox", "fill"]
+    lowercased = _Node({"width": "18", "viewbox": "0 0 16 16", "fill": "none"})
+    adjusted = _Node({"width": "18", "viewBox": "0 0 16 16", "fill": "none"})
+    assert _serialized_names(cast(LexborNode, lowercased)) == expected
+    assert _serialized_names(cast(LexborNode, adjusted)) == expected
+    # a start tag that is not this node's is still refused, which is what the guard is for
+    assert _serialized_names(cast(LexborNode, _Node({"width": "18"}))) is None

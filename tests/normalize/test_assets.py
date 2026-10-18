@@ -14,6 +14,7 @@ import pytest
 from semdiff import Config, NormalizationConfig, normalize, parse
 from semdiff.normalize import BUILTIN_RULES, RuleFamily, Target, apply_rules
 from semdiff.normalize.rules.assets import ASSET_EXTENSIONS, ASSET_RULES, PHASE_ASSET_HASH
+from tests.nodes import one
 
 BY_ID = {rule.id: rule for rule in ASSET_RULES}
 
@@ -104,8 +105,8 @@ NEGATIVE = [
 def first(html: str, attribute: str = "src") -> str:
     """Normalize a one-element document and read the attribute back."""
     result = apply_rules(parse(html.encode()), BUILTIN_RULES, NormalizationConfig())
-    node = result.tree.css_first("script, link, img, a, source")
-    return "" if node is None else (node.attributes.get(attribute) or "")
+    node = one(result.tree, "script, link, img, a, source")
+    return node.attributes.get(attribute) or ""
 
 
 def applications(html: str) -> list[tuple[str, str, str]]:
@@ -138,8 +139,7 @@ def test_rewrite_happens_in_place_and_keeps_the_attribute(rule_id: str, url: str
 def test_covered_attributes(attribute: str) -> None:
     html = f'<link {attribute}="/assets/js/main.3eef80bd.js">'
     result = apply_rules(parse(html.encode()), BUILTIN_RULES, NormalizationConfig())
-    node = result.tree.css_first("link")
-    assert node is not None
+    node = one(result.tree, "link")
     assert node.attributes.get(attribute) == "/assets/js/main.js"
 
 
@@ -147,8 +147,7 @@ def test_srcset_rewrites_every_url_in_the_list() -> None:
     before = "/img/hero.a1b2c3d4.png 1x, /img/hero.e5f6a7b8.png 2x"
     html = f'<img srcset="{before}" src="/img/hero.a1b2c3d4.png">'
     result = apply_rules(parse(html.encode()), BUILTIN_RULES, NormalizationConfig())
-    node = result.tree.css_first("img")
-    assert node is not None
+    node = one(result.tree, "img")
     assert node.attributes.get("srcset") == "/img/hero.png 1x, /img/hero.png 2x"
     assert node.attributes.get("src") == "/img/hero.png"
 
@@ -156,8 +155,7 @@ def test_srcset_rewrites_every_url_in_the_list() -> None:
 def test_other_attributes_are_out_of_scope() -> None:
     html = '<meta name="build-hash" content="db0488c167154941ce4686074ef69e757e1f3492">'
     result = apply_rules(parse(html.encode()), BUILTIN_RULES, NormalizationConfig())
-    node = result.tree.css_first("meta")
-    assert node is not None
+    node = one(result.tree, "meta")
     # F-014 is deliberately not this family's business.
     assert node.attributes.get("content") == "db0488c167154941ce4686074ef69e757e1f3492"
 
@@ -196,8 +194,8 @@ def test_each_rule_is_individually_toggleable(rule_id: str) -> None:
     html = f'<script src="{url}"></script>'
     off = NormalizationConfig(disabled_rules=frozenset({rule_id}))
     result = apply_rules(parse(html.encode()), BUILTIN_RULES, off)
-    node = result.tree.css_first("script")
-    assert node is not None and node.attributes.get("src") == url
+    node = one(result.tree, "script")
+    assert node.attributes.get("src") == url
 
 
 def test_provenance_determinism_and_input_untouched() -> None:

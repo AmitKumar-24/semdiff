@@ -9,11 +9,13 @@ from semdiff.errors import (
     SemDiffError,
 )
 from semdiff.normalize.api import normalize
-from semdiff.parse import ParsedDoc, parse
+from semdiff.parse import PARSER_ID, PARSER_VERSION, ParsedDoc, parse, parser_fingerprint
 
 __version__ = "0.0.0"
 
 __all__ = [
+    "PARSER_ID",
+    "PARSER_VERSION",
     "AlignmentBudgetExceeded",
     "Config",
     "ErrorRecord",
@@ -26,4 +28,5 @@ __all__ = [
     "__version__",
     "normalize",
     "parse",
+    "parser_fingerprint",
 ]

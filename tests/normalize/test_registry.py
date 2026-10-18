@@ -25,6 +25,7 @@ from semdiff.normalize.registry import (
     ruleset_fingerprint,
 )
 from tests.normalize.reference import apply_rules_per_rule, records
+from tests.nodes import one
 
 HTML = (
     b'<div id="react-root-7a3b2c" class="card css-1abc2d" data-token="abc">'
@@ -133,9 +134,9 @@ def test_unknown_toggle_id_fails_loud() -> None:
 def test_attribute_value_strip_reports_application() -> None:
     doc = parse(HTML)
     result = apply_rules(doc, make_registry(CLASS_RULE), NormalizationConfig())
-    div = result.tree.css_first("div")
+    div = one(result.tree, "div")
     assert div.attributes["class"] == "card"
-    assert result.tree.css_first("p").attributes["class"] == "kept"
+    assert one(result.tree, "p").attributes["class"] == "kept"
     assert [a.rule_id for a in result.applied_rules] == ["test.class.css", "test.class.css"]
     first = result.applied_rules[0]
     assert (first.before, first.after) == ("card css-1abc2d", "card")
@@ -147,10 +148,10 @@ def test_attribute_value_strip_reports_application() -> None:
 def test_attribute_strip_and_node_drop_and_text_strip() -> None:
     doc = parse(HTML)
     result = apply_rules(doc, make_registry(ID_RULE, NODE_RULE, TEXT_RULE), NormalizationConfig())
-    div = result.tree.css_first("div")
+    div = one(result.tree, "div")
     assert "id" not in div.attributes
     assert result.tree.css_first("aside") is None
-    assert result.tree.css_first("p").text() == "Hello, "
+    assert one(result.tree, "p").text() == "Hello, "
     ids = [a.rule_id for a in result.applied_rules]
     assert ids == ["test.id.hash", "test.node.aside", "test.text.relative"]  # phase order 20, 30, 40
 
@@ -171,7 +172,7 @@ def test_attribute_substring_rewrites_in_place_and_keeps_the_attribute() -> None
     )
     doc = parse(b'<script src="/a/b-1a2b3c.js" data-src="/a/b-1a2b3c.js"></script>')
     result = apply_rules(doc, make_registry(substring), NormalizationConfig())
-    script = result.tree.css_first("script")
+    script = one(result.tree, "script")
     assert script.attributes["src"] == "/a/b.js"
     assert script.attributes["data-src"] == "/a/b-1a2b3c.js"  # outside the rule's scope
     assert [(a.rule_id, a.before, a.after) for a in result.applied_rules] == [
@@ -190,17 +191,17 @@ def test_structured_data_carriers_are_protected() -> None:
     doc = parse(HTML)
     protective = rule("test.any.attr", target=Target.ATTRIBUTE, pattern=r"^css-notouch$", attributes=frozenset())
     result = apply_rules(doc, make_registry(protective, CLASS_RULE, TEXT_RULE), NormalizationConfig())
-    span = result.tree.css_first("span")
+    span = one(result.tree, "span")
     assert span.attributes["itemprop"] == "css-notouch"
     assert span.attributes["about"] == "css-notouch"
-    assert result.tree.css_first("script").text() == '{"date":"3 minutes ago"}'
+    assert one(result.tree, "script").text() == '{"date":"3 minutes ago"}'
 
 
 def test_disabled_rules_do_not_fire() -> None:
     doc = parse(HTML)
     cfg = NormalizationConfig(disabled_rules=frozenset({"test.class.css"}))
     result = apply_rules(doc, make_registry(CLASS_RULE), cfg)
-    assert result.tree.css_first("div").attributes["class"] == "card css-1abc2d"
+    assert one(result.tree, "div").attributes["class"] == "card css-1abc2d"
     assert result.applied_rules == []
 
 
@@ -271,8 +272,8 @@ def test_text_rules_never_enter_a_protected_element(tag: str) -> None:
     """Each case has a text node a traversal really does hand to the rule, and the rule must
     decline all three while rewriting the ordinary ``<p>`` beside them."""
     result = apply_rules(parse(PROTECTED_HTML[tag]), make_registry(STAMP_RULE), NormalizationConfig())
-    assert "STAMP" in (result.tree.css_first(tag).html or "")
-    assert result.tree.css_first("p").text() == "at "
+    assert "STAMP" in (one(result.tree, tag).html or "")
+    assert one(result.tree, "p").text() == "at "
     assert [(a.rule_id, a.before, a.after) for a in result.applied_rules] == [
         ("test.text.stamp", "at STAMP", "at ")
     ]
@@ -291,14 +292,14 @@ def test_an_html_templates_contents_are_unreachable_rather_than_protected() -> N
     """
     tree = LexborHTMLParser("<template><p>STAMP</p></template>")
     assert tree.root is not None
-    template = tree.css_first("template")
+    template = one(tree, "template")
     assert template.child is None and template.text() == "" and tree.css("template p") == []
     assert [n.tag for n in tree.root.traverse(include_text=True) if n.tag == "-text"] == []
     assert "STAMP" in (template.html or "")  # serialization is the only way to it
 
     result = apply_rules(parse(b"<template>STAMP</template>"), make_registry(STAMP_RULE), NormalizationConfig())
     assert result.applied_rules == []  # nothing was offered, so nothing was declined
-    assert "STAMP" in (result.tree.css_first("template").html or "")
+    assert "STAMP" in (one(result.tree, "template").html or "")
 
 
 def test_protection_covers_deep_and_foreign_content() -> None:
@@ -308,8 +309,8 @@ def test_protection_covers_deep_and_foreign_content() -> None:
     )
     result = apply_rules(parse(html), make_registry(STAMP_RULE), NormalizationConfig())
     assert [(a.before, a.after) for a in result.applied_rules] == [("plain STAMP", "plain ")]
-    assert "deep STAMP" in (result.tree.css_first("style").html or "")
-    assert "svg STAMP" in (result.tree.css_first("script").html or "")
+    assert "deep STAMP" in (one(result.tree, "style").html or "")
+    assert "svg STAMP" in (one(result.tree, "script").html or "")
 
 
 def test_protection_holds_after_earlier_text_nodes_are_replaced() -> None:
@@ -324,8 +325,8 @@ def test_protection_holds_after_earlier_text_nodes_are_replaced() -> None:
     assert [(a.before, a.after) for a in result.applied_rules] == [
         ("a STAMP", "a "), ("b STAMP", "b "), ("c STAMP", "c ")
     ]
-    assert result.tree.css_first("script").text() == "keep STAMP"
-    assert "keep STAMP" in (result.tree.css_first("style").html or "")
+    assert one(result.tree, "script").text() == "keep STAMP"
+    assert "keep STAMP" in (one(result.tree, "style").html or "")
 
 
 def test_protected_set_membership_survives_a_second_traversal() -> None:
@@ -365,8 +366,8 @@ def test_several_rules_on_one_attribute_report_in_rule_major_order() -> None:
         ("test.fused.b", "b-1 keep", "keep"),
         ("test.fused.b", "b-2", ""),
     ]
-    assert result.tree.css_first("p").attributes["class"] == "keep"
-    assert "class" not in result.tree.css_first("span").attributes  # STRIP took the last token
+    assert one(result.tree, "p").attributes["class"] == "keep"
+    assert "class" not in one(result.tree, "span").attributes  # STRIP took the last token
 
 
 def test_fused_run_matches_one_pass_per_rule_including_locators() -> None:
@@ -393,7 +394,7 @@ def test_a_rule_naming_no_attributes_joins_the_run_and_sees_every_element() -> N
     assert [(a.rule_id, a.before) for a in result.applied_rules] == [
         ("test.fused.any", "a-1"), ("test.fused.any", "a-1"), ("test.fused.any", "a-1")
     ]
-    assert "class" not in result.tree.css_first("p").attributes
+    assert "class" not in one(result.tree, "p").attributes
 
 
 def test_a_rule_whose_attribute_an_earlier_rule_removed_reports_nothing() -> None:
@@ -416,7 +417,7 @@ def test_a_dropped_node_is_never_offered_to_a_later_attribute_rule() -> None:
     registry = make_registry(CLASS_A, dropper, late)
     result = apply_rules(parse(html), registry, NormalizationConfig())
     assert [a.rule_id for a in result.applied_rules] == ["test.fused.drop", "test.fused.src"]
-    assert result.tree.css_first("img").attributes.get("src") is None
+    assert one(result.tree, "img").attributes.get("src") is None
     assert records(result) == records(apply_rules_per_rule(parse(html), registry, NormalizationConfig()))
     assert [len(run) for run in _runs(registry.effective(NormalizationConfig()))] == [1, 1, 1]
 

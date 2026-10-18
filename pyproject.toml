@@ -22,10 +22,14 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = [
-    # Pinned below 1.0: that release changes attribute handling on foreign-content elements,
-    # so canonical.attr_order stops sorting an <svg>'s attributes (F-027). Adapting the engine
-    # is its own task; the corpus gate needs a deterministic parser until then.
-    "selectolax<1.0",
+    # Unpinned again at T-25. 0.4.x and 1.0.x disagree on how they spell a spec-adjusted
+    # foreign-content attribute key (viewbox vs viewBox), which switched canonical.attr_order
+    # off for every <svg> on 1.0.0 (F-027); the rule now reads the key case-insensitively and
+    # both lines produce byte-identical normalized output, pinned by tests/corpus against
+    # recorded digests. CI runs 0.4.13 and 1.0.0 explicitly, plus a weekly unpinned check.
+    # What still differs between them is a Locator.node_hash on foreign content, which is why
+    # a result names its parser build (D-046).
+    "selectolax>=0.4.11",
     "lxml",
     "extruct",
     "pydantic>=2",

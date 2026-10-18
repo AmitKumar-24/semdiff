@@ -9,6 +9,7 @@ import pytest
 from semdiff import NormalizationConfig, parse
 from semdiff.normalize import BUILTIN_RULES, RuleFamily, Target, apply_rules
 from semdiff.normalize.rules.timestamps import TIMESTAMP_RULES
+from tests.nodes import one
 
 BY_ID = {rule.id: rule for rule in TIMESTAMP_RULES}
 # These tests inspect the serialized text as the timestamp family leaves it, before the
@@ -165,4 +166,4 @@ def test_provenance_determinism_and_input_untouched() -> None:
     ]
     assert all((a.locator.css or "").endswith("> div > p:nth-child(2)") for a in fired)
     assert all(re.fullmatch(r"[0-9a-f]{64}", a.locator.node_hash) for a in fired)
-    assert first.tree.css_first("p").text() == "Updated  at "
+    assert one(first.tree, "p").text() == "Updated  at "

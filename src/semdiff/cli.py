@@ -19,7 +19,7 @@ from pathlib import Path
 
 from semdiff import Config, NormalizationConfig, SemDiffError, __version__
 from semdiff.normalize import BUILTIN_RULES, NormalizedDoc, apply_rules
-from semdiff.parse import parse
+from semdiff.parse import parse, parser_fingerprint
 
 EXIT_OK = 0
 EXIT_ERROR = 1
@@ -60,12 +60,17 @@ def _load_config(args: argparse.Namespace) -> Config:
 
 
 def _report(result: NormalizedDoc) -> str:
-    """One line per rule that fired, in the order the rules ran, with application counts."""
+    """One line per rule that fired, in the order the rules ran, with application counts.
+
+    The parser build is named first: it is the one input to a result that the config does not
+    cover (D-046), so a report that omitted it could not be reproduced from what it printed.
+    """
+    header = f"parser {parser_fingerprint()}"
     counts = Counter(application.rule_id for application in result.applied_rules)
     if not counts:
-        return "no rules fired\n"
+        return f"{header}\nno rules fired\n"
     width = max(len(rule_id) for rule_id in counts)
-    lines = [f"{len(counts)} rules fired, {sum(counts.values())} applications"]
+    lines = [header, f"{len(counts)} rules fired, {sum(counts.values())} applications"]
     lines += [f"  {rule_id:<{width}}  {count}" for rule_id, count in counts.items()]
     return "\n".join(lines) + "\n"
 
@@ -107,7 +112,9 @@ def _normalize(args: argparse.Namespace) -> int:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="semdiff", description="Semantic HTML change detection.")
-    parser.add_argument("--version", action="version", version=__version__)
+    parser.add_argument(
+        "--version", action="version", version=f"{__version__} ({parser_fingerprint()})"
+    )
     commands = parser.add_subparsers(dest="command", required=True)
 
     normalize_parser = commands.add_parser(

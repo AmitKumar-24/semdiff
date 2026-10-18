@@ -13,6 +13,7 @@ import re
 from selectolax.lexbor import LexborHTMLParser, LexborNode
 
 from semdiff.locator import Locator
+from tests.nodes import one
 
 NESTED = '<div id="outer" class="a"><p id="inner" class="b">text</p></div>'
 
@@ -34,7 +35,7 @@ def first(html: str, tag: str) -> LexborNode:
 def test_a_descendant_rewrite_leaves_its_ancestor_fingerprint_alone() -> None:
     """The point of D-044. The ancestor did not change, so its provenance must not either."""
     tree = tree_of(NESTED)
-    outer, inner = tree.css_first("div"), tree.css_first("p")
+    outer, inner = one(tree, "div"), one(tree, "p")
     before_outer, before_inner = Locator.for_node(outer), Locator.for_node(inner)
 
     inner.attrs["class"] = "rewritten"  # what a normalization rule does to a descendant
@@ -45,7 +46,7 @@ def test_a_descendant_rewrite_leaves_its_ancestor_fingerprint_alone() -> None:
 def test_a_descendant_text_rewrite_also_leaves_the_ancestor_alone() -> None:
     tree = tree_of(NESTED)
     assert tree.root is not None
-    outer = tree.css_first("div")
+    outer = one(tree, "div")
     before = Locator.for_node(outer)
     text = next(n for n in tree.root.traverse(include_text=True) if n.tag == "-text")
     text.replace_with("something else entirely")
@@ -55,7 +56,7 @@ def test_a_descendant_text_rewrite_also_leaves_the_ancestor_alone() -> None:
 
 def test_the_fingerprint_still_changes_when_the_node_itself_changes() -> None:
     tree = tree_of(NESTED)
-    node = tree.css_first("p")
+    node = one(tree, "p")
     original = Locator.for_node(node).node_hash
 
     node.attrs["class"] = "c"
@@ -68,21 +69,21 @@ def test_the_fingerprint_still_changes_when_the_node_itself_changes() -> None:
 
 def test_attribute_order_does_not_affect_the_fingerprint() -> None:
     """Attributes are sorted before hashing, so canonical.attr_order cannot move it."""
-    first = Locator.for_node(tree_of('<p id="a" class="b">x</p>').css_first("p"))
-    second = Locator.for_node(tree_of('<p class="b" id="a">x</p>').css_first("p"))
+    first = Locator.for_node(one(tree_of('<p id="a" class="b">x</p>'), "p"))
+    second = Locator.for_node(one(tree_of('<p class="b" id="a">x</p>'), "p"))
     assert first.node_hash == second.node_hash
 
 
 def test_two_attribute_sets_that_would_collide_under_a_flat_join_do_not() -> None:
-    a = Locator.for_node(tree_of('<p a="b c=d">x</p>').css_first("p"))
-    b = Locator.for_node(tree_of('<p a="b" c="d">x</p>').css_first("p"))
+    a = Locator.for_node(one(tree_of('<p a="b c=d">x</p>'), "p"))
+    b = Locator.for_node(one(tree_of('<p a="b" c="d">x</p>'), "p"))
     assert a.node_hash != b.node_hash
 
 
 def test_a_boolean_attribute_hashes_like_an_empty_one() -> None:
     """The canonical serializer unifies the two forms (D-032), so the fingerprint follows it."""
-    boolean = Locator.for_node(tree_of("<input disabled>").css_first("input"))
-    empty = Locator.for_node(tree_of('<input disabled="">').css_first("input"))
+    boolean = Locator.for_node(one(tree_of("<input disabled>"), "input"))
+    empty = Locator.for_node(one(tree_of('<input disabled="">'), "input"))
     assert boolean.node_hash == empty.node_hash
 
 
@@ -107,8 +108,8 @@ def test_the_unchanged_half_of_the_locator() -> None:
 
 
 def test_the_fingerprint_is_a_deterministic_sha256() -> None:
-    first = Locator.for_node(tree_of(NESTED).css_first("p")).node_hash
-    second = Locator.for_node(tree_of(NESTED).css_first("p")).node_hash
+    first = Locator.for_node(one(tree_of(NESTED), "p")).node_hash
+    second = Locator.for_node(one(tree_of(NESTED), "p")).node_hash
     assert first == second
     assert re.fullmatch(r"[0-9a-f]{64}", first)
 

@@ -15,6 +15,7 @@ from semdiff.normalize import (
     apply_rules,
 )
 from semdiff.normalize.rules.ids import ENTROPY_MIN_BITS, ENTROPY_MIN_LENGTH, ID_RULES
+from tests.nodes import one
 
 BY_ID = {rule.id: rule for rule in ID_RULES}
 
@@ -90,17 +91,17 @@ def test_end_to_end_placeholders_only_hashed_ids() -> None:
         b'<span itemid="react-root-7a3b2c" id="product-card">y</span></div></main>'
     )
     result = apply_rules(doc, BUILTIN_RULES, NormalizationConfig())
-    assert result.tree.css_first("main").attributes["id"] == "main"
-    div = result.tree.css_first("div")
+    assert one(result.tree, "main").attributes["id"] == "main"
+    div = one(result.tree, "div")
     assert div.attributes["id"] == "react-root-__semdiff__"  # T-18: the prefix survives with it
     assert div.attributes["class"] == "react-root-7a3b2c"  # class is not this family's business
     assert div.attributes["data-id"] == "react-root-7a3b2c"
-    label = result.tree.css_first("label")
+    label = one(result.tree, "label")
     # F-006 closed: the id and the for pointing at it are rewritten to the same text, so the
     # reference still resolves. No mapping is kept anywhere — the sentinel is a constant.
     assert label.attributes["id"] == PLACEHOLDER
     assert label.attributes["for"] == PLACEHOLDER
-    span = result.tree.css_first("span")
+    span = one(result.tree, "span")
     assert span.attributes["itemid"] == "react-root-7a3b2c"
     assert span.attributes["id"] == "product-card"
     fired = [(a.rule_id, a.before, a.after) for a in result.applied_rules if a.rule_id.startswith("id.")]
@@ -117,8 +118,8 @@ def test_each_rule_is_individually_toggleable(rule_id: str) -> None:
     value = POSITIVE[rule_id][0]
     doc = parse(f'<p id="{value}">x</p>'.encode())
     off = NormalizationConfig(disabled_rules=frozenset({rule_id}))
-    assert apply_rules(doc, BUILTIN_RULES, off).tree.css_first("p").attributes["id"] == value
-    on = apply_rules(doc, BUILTIN_RULES, NormalizationConfig()).tree.css_first("p").attributes["id"]
+    assert one(apply_rules(doc, BUILTIN_RULES, off).tree, "p").attributes["id"] == value
+    on = one(apply_rules(doc, BUILTIN_RULES, NormalizationConfig()).tree, "p").attributes["id"]
     assert on is not None and on != value and PLACEHOLDER in on  # attribute stays, hash does not
 
 
@@ -129,5 +130,5 @@ def test_input_tree_not_mutated_and_output_deterministic() -> None:
     second = apply_rules(doc, BUILTIN_RULES, NormalizationConfig())
     assert doc.tree.html == before
     assert first.tree.html == second.tree.html
-    assert first.tree.css_first("div").attributes["id"] == PLACEHOLDER
-    assert first.tree.css_first("p").attributes["id"] == PLACEHOLDER
+    assert one(first.tree, "div").attributes["id"] == PLACEHOLDER
+    assert one(first.tree, "p").attributes["id"] == PLACEHOLDER

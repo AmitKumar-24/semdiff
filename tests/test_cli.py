@@ -24,6 +24,7 @@ from semdiff.cli import (
     EXIT_USAGE,
     main,
 )
+from semdiff.parse import parser_fingerprint
 
 NOISY = (
     '<div class="card css-1dbjc4n" id="react-root-7a3b2c">\n'
@@ -252,3 +253,21 @@ def test_module_entry_point_runs(page: Path) -> None:
     assert done.returncode == EXIT_OK
     assert done.stdout.decode("utf-8") == CLEAN
     assert done.stderr == b""
+
+
+def test_report_names_the_parser_build(page: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """T-25, D-046: the one input to a result that ``config_hash`` does not cover. It goes to
+    stderr with the rest of the report, so stdout stays byte-identical."""
+    assert main(["normalize", str(page), "--report"]) == EXIT_OK
+    captured = capsys.readouterr()
+    assert captured.err.splitlines()[0] == f"parser {parser_fingerprint()}"
+    assert captured.out == CLEAN
+
+
+def test_report_names_the_parser_even_when_no_rule_fires(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    source = tmp_path / "quiet.html"
+    source.write_text("<p>nothing to do</p>", encoding="utf-8")
+    assert main(["normalize", str(source), "--report"]) == EXIT_OK
+    assert capsys.readouterr().err == f"parser {parser_fingerprint()}\nno rules fired\n"

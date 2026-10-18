@@ -117,13 +117,19 @@ _START_TAG_ATTR = re.compile(r"""\s([^\s=/>"']+)(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\
 def _serialized_names(node: LexborNode) -> list[str] | None:
     """Attribute names as the serializer spells them (``viewBox``), in source order.
 
-    ``node.attributes`` keys are lowercased, but Lexbor keeps the spec-adjusted spelling of
-    foreign-content attributes; re-inserting through the lowercase key would lose it.
+    Lexbor keeps the spec-adjusted spelling of a foreign-content attribute in the markup, and
+    re-inserting through a lowercase key would lose it — so the rewrite works from the names in
+    the start tag, and this guard checks they really are the node's attributes before trusting
+    them. The comparison is case-insensitive on **both** sides because the key spelling is a
+    parser-version detail: selectolax 0.4.x reports ``viewbox`` for ``viewBox`` and 1.0.0
+    reports ``viewBox`` (F-027, D-046). Matching case-sensitively made the guard reject every
+    ``<svg>`` on 1.0.0, which silently switched the rule off there.
     """
     html = node.html or ""
     end = html.find(">")
     names = _START_TAG_ATTR.findall(html[: end if end >= 0 else len(html)])
-    return names if [n.lower() for n in names] == list(node.attributes) else None
+    keys = [key.lower() for key in node.attributes]
+    return names if [n.lower() for n in names] == keys else None
 
 
 def sort_attributes(rule: NormalizationRule, tree: LexborHTMLParser) -> list[RuleApplication]:
@@ -140,9 +146,13 @@ def sort_attributes(rule: NormalizationRule, tree: LexborHTMLParser) -> list[Rul
         if names == ordered:
             continue
         locator = Locator.for_node(node)
-        values = dict(node.attributes)
+        # Keyed by the lowercase name, because the key the parser reports may be spelled either
+        # way (F-027); ``spelled`` maps back to whatever this parser actually used, which is the
+        # only key a deletion will accept. What goes back in is the start tag's own spelling.
+        values = {key.lower(): value for key, value in node.attributes.items()}
+        spelled = {key.lower(): key for key in node.attributes}
         for name in names:
-            del node.attrs[name.lower()]
+            del node.attrs[spelled[name.lower()]]
         for name in ordered:
             node.attrs[name] = values[name.lower()] or ""
         out.append(RuleApplication(rule.id, locator, " ".join(names), " ".join(ordered)))

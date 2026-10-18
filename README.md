@@ -72,6 +72,7 @@ semdiff normalize page.html --config semdiff.json
 
 ```
 $ semdiff normalize page.html --report > clean.html
+parser selectolax/1.0.0
 6 rules fired, 10 applications
   class.emotion           1
   id.hex_suffix           1
@@ -86,8 +87,11 @@ Exit codes: `0` success, `2` bad command line, `3` parse error, `4` input too la
 
 ### Guarantees
 
-- **Deterministic.** Same input and config, same output — no clock, no network, no randomness.
-  `Config.config_hash` covers the ruleset version, so a result is reproducible.
+- **Deterministic.** Same input, same config and same parser build, same output — no clock,
+  no network, no randomness. `Config.config_hash` covers the config and the ruleset version;
+  the parser is the one input it does not cover, so `semdiff.parser_fingerprint()` names it
+  (`selectolax/1.0.0`) and `--report` prints it. Normalized output is identical across the
+  selectolax versions CI covers; a `Locator.node_hash` on foreign content is not (F-027).
 - **Idempotent.** `normalize(normalize(x)) == normalize(x)`.
 - **Safe.** Input is untrusted: parse-only, no script execution, no external entity
   resolution, no outbound requests.
@@ -99,6 +103,8 @@ pip install -e ".[dev]"
 ```
 
 Requires Python 3.11+. Runtime dependencies: `selectolax`, `lxml`, `extruct`, `pydantic`.
+Both selectolax lines are supported and tested: CI runs 0.4.13 and 1.0.0 against every
+Python version, plus a weekly job on whatever is newest.
 
 ## Development
 
@@ -107,7 +113,7 @@ pytest -q
 mypy --strict src/semdiff tests scripts
 ```
 
-CI runs both on Python 3.11, 3.12 and 3.13.
+CI runs both on Python 3.11, 3.12 and 3.13, against selectolax 0.4.13 and 1.0.0.
 
 ## Documentation
 

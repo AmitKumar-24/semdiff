@@ -1,0 +1,166 @@
+{
+ "_comment": "T-25 parser contract: sha256 of each snapshot's normalized output, and of its application records with node_hash excluded (F-027, D-046). Identical on every selectolax build listed in verified_on; node_hash is not covered and does differ.",
+ "snapshots": {
+  "babeljs-io-001-new": {
+   "output": "5923c7f4a33bce08fffe4acca911d5e123eed2f1480cf188bbbbafc56e8ae96e",
+   "records": "3a8a6cfb3577d65b2cdc0df08e819d54b45d4e7d3ea0a7e7eab110827ee4f79a"
+  },
+  "babeljs-io-001-old": {
+   "output": "5923c7f4a33bce08fffe4acca911d5e123eed2f1480cf188bbbbafc56e8ae96e",
+   "records": "4f2ea27fe41db3f1a5d75ab67642a6d157a68ee698ce1769d6dd50fd23531120"
+  },
+  "babeljs-io-002-new": {
+   "output": "5923c7f4a33bce08fffe4acca911d5e123eed2f1480cf188bbbbafc56e8ae96e",
+   "records": "b8af2c2bdd997d7642050b9e559f409332886e5a9ad68881a3c7ee8dd001c258"
+  },
+  "babeljs-io-002-old": {
+   "output": "5923c7f4a33bce08fffe4acca911d5e123eed2f1480cf188bbbbafc56e8ae96e",
+   "records": "3a8a6cfb3577d65b2cdc0df08e819d54b45d4e7d3ea0a7e7eab110827ee4f79a"
+  },
+  "docs-python-org-001-new": {
+   "output": "870002da6cacfc4bdc5ff62753c7bafb5ae54cefbaf8dc0a47459af347f7e986",
+   "records": "4187f09247eba3d6988ef0d583cbde3a785b0c93813a75ff8e3c275b048467f4"
+  },
+  "docs-python-org-001-old": {
+   "output": "870002da6cacfc4bdc5ff62753c7bafb5ae54cefbaf8dc0a47459af347f7e986",
+   "records": "ca4c48a035faf06699648c263cbfcb457d904618188aa5c2054b882883acbcb7"
+  },
+  "docs-python-org-002-new": {
+   "output": "7e1164c0519efdd6528d7d080b7f52bb3f015cd1e74d2365b1d6120fdee55276",
+   "records": "21695b5eff19ebf23df6ce43c409cd5388bd755875972fd950a533b84620ac12"
+  },
+  "docs-python-org-002-old": {
+   "output": "7e1164c0519efdd6528d7d080b7f52bb3f015cd1e74d2365b1d6120fdee55276",
+   "records": "46a40dd21cc46f76eeb65934cc670bf2563f83caa5cf625f62945d61afb6a3b0"
+  },
+  "docs-python-org-004-new": {
+   "output": "04550ab3ca9760a7fe0da0e467d7c5a4cb4d4a521e1e3cd3a08e1a8f816a4057",
+   "records": "1ee7e61189770f5d61be4177ef2d0a971a7fb16fc313143cb9c4cd00db811f31"
+  },
+  "docs-python-org-004-old": {
+   "output": "04550ab3ca9760a7fe0da0e467d7c5a4cb4d4a521e1e3cd3a08e1a8f816a4057",
+   "records": "4402a94bb57a2880fd550aaad98c5aa701f335a666c2acf88cc49cca7857bbec"
+  },
+  "docs-python-org-005-new": {
+   "output": "e2ca9d99b6bb34aba55c3b23c1df56b930ffee9abd148f67129134f67414e1e6",
+   "records": "6681f83e0df184df761f23e3c6269130846fb1bd3465040958c332b8ce46cc13"
+  },
+  "docs-python-org-005-old": {
+   "output": "e2ca9d99b6bb34aba55c3b23c1df56b930ffee9abd148f67129134f67414e1e6",
+   "records": "784d33f5147cb8f06c3a04d74f501b7dbd3346262a0c3b02f8eaec88b3ae5559"
+  },
+  "docs-python-org-006-new": {
+   "output": "5f7a28ac67e9d4bdf128b09a9474a9c22d847e97d04d312b6618a6fd53a1ca58",
+   "records": "71f75cfbd3020e5419e6abdd4b7038bac13e35fa5640ea3b7a2bcb8c6d144338"
+  },
+  "docs-python-org-006-old": {
+   "output": "5f7a28ac67e9d4bdf128b09a9474a9c22d847e97d04d312b6618a6fd53a1ca58",
+   "records": "495e7647bf935f132de9d0650f0888abbf4dc4673b7fd230de1ff3f8a5398048"
+  },
+  "docs-python-org-007-new": {
+   "output": "134fed05f0097a02704d3bd130904cb8d5a4e3fb1ede97889e7bdfb01d4655b6",
+   "records": "5a3970315df4a07e718969e4bebfaa7c9d479e75c47a01031837586aae3b6e91"
+  },
+  "docs-python-org-007-old": {
+   "output": "134fed05f0097a02704d3bd130904cb8d5a4e3fb1ede97889e7bdfb01d4655b6",
+   "records": "ad71370ce4bbcceacab78833b4a7e1ed98383cbab55585507ade1a6665672058"
+  },
+  "docusaurus-io-001-new": {
+   "output": "91d34c45cde8b68a5a85d4b49731f2428635eebf7386e6b21908d92683c2082b",
+   "records": "0e6cb3e680dd31a52463424db164053a005b7a7e335aaa97848384f7a8569f79"
+  },
+  "docusaurus-io-001-old": {
+   "output": "91d34c45cde8b68a5a85d4b49731f2428635eebf7386e6b21908d92683c2082b",
+   "records": "563451f6a18d879e21cdf75b9dc32b633d733c628f8d94fcd23292020b66b2a8"
+  },
+  "docusaurus-io-002-new": {
+   "output": "854ad47898c18a1c3f35cece28a964bb8ca748e4a9b9b7ede9fd3817aeb5cbae",
+   "records": "dda36081e46c6964e69673c7fcb4ba8772aeaac3b0d26bd3c05513ef39b7ba3c"
+  },
+  "docusaurus-io-002-old": {
+   "output": "854ad47898c18a1c3f35cece28a964bb8ca748e4a9b9b7ede9fd3817aeb5cbae",
+   "records": "c657773c55aa377ba15e327377945f76a2305095960bb8ae18e42defb6e0066e"
+  },
+  "docusaurus-io-003-new": {
+   "output": "3cff21d77ae511d8ef26b5b9cc659e8ab5e7a9fda8cb98fddb90685b3cba4d7d",
+   "records": "0d4e4c317068aba370f22c6268c6f654342faa477a47745704e9fe122c363816"
+  },
+  "docusaurus-io-003-old": {
+   "output": "3cff21d77ae511d8ef26b5b9cc659e8ab5e7a9fda8cb98fddb90685b3cba4d7d",
+   "records": "7f416c2ad0c0f95b36784d0dbf9c3f5cf2a8690b4bde069f41a9ab1af4b62537"
+  },
+  "docusaurus-io-004-new": {
+   "output": "9ca3841a6964ad7f75f3a3a3a718bb7880b978f0ac1db97b427eec725fcb755f",
+   "records": "b96fd886ee1f7649221c2ebbf27232452c9651d9f57f45d75f8b32df52979622"
+  },
+  "docusaurus-io-004-old": {
+   "output": "9ca3841a6964ad7f75f3a3a3a718bb7880b978f0ac1db97b427eec725fcb755f",
+   "records": "e23a5fc62b9d7d62179bb621d517e3e72d0bbc77fe44de5ed2972e7141829a0b"
+  },
+  "docusaurus-io-005-new": {
+   "output": "bb917dc7fc929811b02eb8130a822f547530fc44509124994f5b94ed5c47b390",
+   "records": "d3b1f31625ecacd9767ec5cb058cb84f73f1e1bbc1f548d6fec67d12e775de1c"
+  },
+  "docusaurus-io-005-old": {
+   "output": "bb917dc7fc929811b02eb8130a822f547530fc44509124994f5b94ed5c47b390",
+   "records": "5421beab1185ec0a4faeddcf5339ec4606e6e749a199d3d2b3c46c5a24e10823"
+  },
+  "pnpm-io-001-new": {
+   "output": "d5ffa72a57a981f8edc00e8ebd52002f8cd327539e5863d4921522739f1858a8",
+   "records": "06709b7807554a963179f51d0dc6de092bc1dce645fcf0163c7ee7ea630f608e"
+  },
+  "pnpm-io-001-old": {
+   "output": "d5ffa72a57a981f8edc00e8ebd52002f8cd327539e5863d4921522739f1858a8",
+   "records": "d04028f32292bc95ab860fef6483fc638df8519f3e11ae9325ca9f0d83e1ecae"
+  },
+  "pnpm-io-002-new": {
+   "output": "d5ffa72a57a981f8edc00e8ebd52002f8cd327539e5863d4921522739f1858a8",
+   "records": "30b216772c1fce9dbc02d7fc6b7301379e942eeadd508cc01c0e437204a4151c"
+  },
+  "pnpm-io-002-old": {
+   "output": "d5ffa72a57a981f8edc00e8ebd52002f8cd327539e5863d4921522739f1858a8",
+   "records": "06709b7807554a963179f51d0dc6de092bc1dce645fcf0163c7ee7ea630f608e"
+  },
+  "reactnative-dev-001-new": {
+   "output": "1ce754c9162a12d78d5fc755705636cf4a1fbc83c53b71f43411d9c31835050d",
+   "records": "41e4441964dd84ed28ab60d44218eaee8149b14d6379384f06f3ece1932e33bb"
+  },
+  "reactnative-dev-001-old": {
+   "output": "1ce754c9162a12d78d5fc755705636cf4a1fbc83c53b71f43411d9c31835050d",
+   "records": "845d1310def18d1aa7db2692c1707ff6e07e86cfb7f12b40ef9716c9470d00e8"
+  },
+  "reactnative-dev-002-new": {
+   "output": "82852c756b369517b04742d432dddd87d8c13e8a5822400d388d013d4a9bbfa7",
+   "records": "1f0f151e8be2c07580ae8cc864083b0fbe6eecab6617831d2edebbc56d4b3101"
+  },
+  "reactnative-dev-002-old": {
+   "output": "82852c756b369517b04742d432dddd87d8c13e8a5822400d388d013d4a9bbfa7",
+   "records": "0843d7be14203c2605a09fdd08cd53f75c689e921f7090b5c708acf7f03acf72"
+  },
+  "reactnative-dev-003-new": {
+   "output": "1ce754c9162a12d78d5fc755705636cf4a1fbc83c53b71f43411d9c31835050d",
+   "records": "14c8c979a9cc55e67e077480f70f1e9b998d8dea4b673f783078eae4ea26f0c7"
+  },
+  "reactnative-dev-003-old": {
+   "output": "1ce754c9162a12d78d5fc755705636cf4a1fbc83c53b71f43411d9c31835050d",
+   "records": "41e4441964dd84ed28ab60d44218eaee8149b14d6379384f06f3ece1932e33bb"
+  },
+  "reactnative-dev-004-new": {
+   "output": "82852c756b369517b04742d432dddd87d8c13e8a5822400d388d013d4a9bbfa7",
+   "records": "e546397968a405fe3dda9f9c1b0c8eaf7664e1e634d460f2591d574582304ba2"
+  },
+  "reactnative-dev-004-old": {
+   "output": "82852c756b369517b04742d432dddd87d8c13e8a5822400d388d013d4a9bbfa7",
+   "records": "1f0f151e8be2c07580ae8cc864083b0fbe6eecab6617831d2edebbc56d4b3101"
+  },
+  "redux-js-org-001-new": {
+   "output": "0fd4a4e5b3cf8484ef82b880099e6a0cc563505d5de505c623545d7dfd628d5f",
+   "records": "5d3001afcedd6b1c8ec931f2b44e8a2430a9ade4bd995f4bb56495b4cdd6a543"
+  },
+  "redux-js-org-001-old": {
+   "output": "0fd4a4e5b3cf8484ef82b880099e6a0cc563505d5de505c623545d7dfd628d5f",
+   "records": "23bededac174b01ef750e371f9e1cd3b9cf125d8df905c52f4637670fc46b7d9"
+  }
+ },
+ "verified_on": "selectolax 0.4.11, 0.4.13 and 1.0.0"
+}

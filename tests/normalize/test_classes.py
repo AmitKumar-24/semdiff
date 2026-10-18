@@ -7,6 +7,7 @@ import pytest
 from semdiff import NormalizationConfig, parse
 from semdiff.normalize import BUILTIN_RULES, RuleFamily, apply_rules
 from semdiff.normalize.rules.classes import CLASS_RULES
+from tests.nodes import one
 
 BY_ID = {rule.id: rule for rule in CLASS_RULES}
 
@@ -61,10 +62,10 @@ def test_end_to_end_placeholder_preserves_static_tokens_and_order() -> None:
     result = apply_rules(doc, BUILTIN_RULES, NormalizationConfig())
     # T-18: a matching token becomes the sentinel in place, so position, order and the
     # attribute itself survive — <div class="css-1abc2d"> no longer normalizes to <div>.
-    assert result.tree.css_first("div").attributes["class"] == "MuiBox-root __semdiff__ markdown-body __semdiff__"
-    assert result.tree.css_first("p").attributes["class"] == "__semdiff__"
-    assert result.tree.css_first("p").attributes["id"] == "css-1p1nqj6"  # not a class: untouched by T-13
-    assert result.tree.css_first("span").attributes["itemprop"] == "css-1p1nqj6"
+    assert one(result.tree, "div").attributes["class"] == "MuiBox-root __semdiff__ markdown-body __semdiff__"
+    assert one(result.tree, "p").attributes["class"] == "__semdiff__"
+    assert one(result.tree, "p").attributes["id"] == "css-1p1nqj6"  # not a class: untouched by T-13
+    assert one(result.tree, "span").attributes["itemprop"] == "css-1p1nqj6"
     fired = [(a.rule_id, a.before, a.after) for a in result.applied_rules if a.rule_id.startswith("class.")]
     assert fired == [
         ("class.css_modules", "MuiBox-root css-1p1nqj6 markdown-body categoryLinkLabel_O4bj", "MuiBox-root css-1p1nqj6 markdown-body __semdiff__"),
@@ -78,8 +79,8 @@ def test_each_rule_is_individually_toggleable(rule_id: str) -> None:
     token = POSITIVE[rule_id][0]
     doc = parse(f'<p class="{token} static">x</p>'.encode())
     off = NormalizationConfig(disabled_rules=frozenset({rule_id}))
-    assert apply_rules(doc, BUILTIN_RULES, off).tree.css_first("p").attributes["class"] == f"{token} static"
-    assert apply_rules(doc, BUILTIN_RULES, NormalizationConfig()).tree.css_first("p").attributes["class"] == "__semdiff__ static"
+    assert one(apply_rules(doc, BUILTIN_RULES, off).tree, "p").attributes["class"] == f"{token} static"
+    assert one(apply_rules(doc, BUILTIN_RULES, NormalizationConfig()).tree, "p").attributes["class"] == "__semdiff__ static"
 
 
 def test_input_tree_not_mutated_and_output_deterministic() -> None:
@@ -89,6 +90,6 @@ def test_input_tree_not_mutated_and_output_deterministic() -> None:
     second = apply_rules(doc, BUILTIN_RULES, NormalizationConfig())
     assert doc.tree.html == before
     assert first.tree.html == second.tree.html
-    assert first.tree.css_first("div").attributes["class"] == "__semdiff__ a"
-    assert first.tree.css_first("p").attributes["class"] == "__semdiff__ __semdiff__ b"
+    assert one(first.tree, "div").attributes["class"] == "__semdiff__ a"
+    assert one(first.tree, "p").attributes["class"] == "__semdiff__ __semdiff__ b"
 

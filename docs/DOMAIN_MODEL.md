@@ -30,11 +30,13 @@ Two distinctions that carry most of the model's weight:
 
 ```python
 Snapshot        = (content: bytes, url: str | None, label: str)   # "old" | "new"
-ParsedDoc       = (tree, encoding, parser_id, url)
+ParsedDoc       = (tree, encoding, parser_id, url, parser_version)
 NormalizedDoc   = (tree, applied_rules: list[RuleApplication])
 FilteredDoc     = (tree, removals: list[Removal])
 ExtractionResult = (entities: EntitySet, residual_tree, gaps: list[ExtractionGap])
 ```
+
+`parser_version` is additive (D-046): `config_hash` covers the configuration and the ruleset but not the parser build, so a result names the build that produced it rather than pretending the hash accounts for it.
 
 Each stage is a distinct type, not a mutated tree. Locators captured at stage *n* are only valid against stage *n*, and `Provenance` records which stage it came from. Without that, a reported XPath silently points at a node that normalization deleted.
 

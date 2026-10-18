@@ -29,6 +29,7 @@ from semdiff.normalize import (
 )
 from tests.corpus.labels import Category
 from tests.corpus.loader import load_pairs
+from tests.nodes import one
 
 
 def rule(
@@ -66,7 +67,7 @@ def reported(result: NormalizedDoc) -> list[tuple[str, str, str]]:
 
 
 def body(result: NormalizedDoc) -> str:
-    return (result.tree.css_first("body").html or "").removeprefix("<body>").removesuffix("</body>")
+    return (one(result.tree, "body").html or "").removeprefix("<body>").removesuffix("</body>")
 
 
 HASHED = rule("t.attr", Target.ATTRIBUTE, RegexMatcher(r"^h-[0-9a-f]{6}$"), attributes=frozenset({"id"}))
@@ -78,26 +79,26 @@ TEXT = rule("t.text", Target.TEXT, RegexMatcher(r"\d+ minutes ago"), phase=40)
 # --- one test per target ---------------------------------------------------------------------
 def test_attribute_target_keeps_the_attribute_and_reports_both_sides() -> None:
     result = run(b'<p id="h-1a2b3c">x</p>', HASHED)
-    assert result.tree.css_first("p").attributes["id"] == PLACEHOLDER
+    assert one(result.tree, "p").attributes["id"] == PLACEHOLDER
     assert reported(result) == [("t.attr", "h-1a2b3c", PLACEHOLDER)]
 
 
 def test_attribute_value_target_replaces_the_token_in_place() -> None:
     """Position and token count are the point: a dropped token would move its neighbours."""
     result = run(b'<p class="a h-1a2b3c b h-9f8e7d">x</p>', TOKENS)
-    assert result.tree.css_first("p").attributes["class"] == f"a {PLACEHOLDER} b {PLACEHOLDER}"
+    assert one(result.tree, "p").attributes["class"] == f"a {PLACEHOLDER} b {PLACEHOLDER}"
     assert reported(result) == [("t.value", "a h-1a2b3c b h-9f8e7d", f"a {PLACEHOLDER} b {PLACEHOLDER}")]
 
 
 def test_attribute_substring_target_keeps_the_rest_of_the_value() -> None:
     result = run(b'<p id="tab-1a2b3c">x</p>', SPAN)
-    assert result.tree.css_first("p").attributes["id"] == f"tab-{PLACEHOLDER}"
+    assert one(result.tree, "p").attributes["id"] == f"tab-{PLACEHOLDER}"
     assert reported(result) == [("t.substring", "tab-1a2b3c", f"tab-{PLACEHOLDER}")]
 
 
 def test_text_target_keeps_the_text_node_in_the_tree() -> None:
     result = run(b"<p>Updated 3 minutes ago.</p>", TEXT)
-    assert result.tree.css_first("p").text() == f"Updated {PLACEHOLDER}."
+    assert one(result.tree, "p").text() == f"Updated {PLACEHOLDER}."
     assert reported(result) == [("t.text", "Updated 3 minutes ago.", f"Updated {PLACEHOLDER}.")]
 
 
@@ -189,15 +190,15 @@ def test_an_id_and_the_reference_to_it_end_up_identical() -> None:
     result = shipped(REFERENCES)
     label, uuid_label = result.tree.css("label")
     assert label.attributes["id"] == label.attributes["for"] == PLACEHOLDER
-    assert uuid_label.attributes["for"] == result.tree.css_first("p").attributes["id"] == PLACEHOLDER
+    assert uuid_label.attributes["for"] == one(result.tree, "p").attributes["id"] == PLACEHOLDER
 
 
 def test_id_lists_keep_their_static_entries_and_their_order() -> None:
     result = shipped(REFERENCES)
-    button = result.tree.css_first("button")
+    button = one(result.tree, "button")
     assert button.attributes["aria-controls"] == f"panel-{PLACEHOLDER} tab-{PLACEHOLDER}"
     assert button.attributes["aria-labelledby"] == f"static lbl-{PLACEHOLDER}"
-    assert result.tree.css_first("td").attributes["headers"] == f"col-{PLACEHOLDER} static"
+    assert one(result.tree, "td").attributes["headers"] == f"col-{PLACEHOLDER} static"
 
 
 def test_href_is_touched_only_inside_a_fragment() -> None:
@@ -244,7 +245,7 @@ def test_an_unmatched_value_comes_through_byte_identical() -> None:
 
 def test_protected_attributes_are_never_placeholdered() -> None:
     html = b'<span itemid="react-root-7a3b2c" itemprop="css-1abc2d" about="_R_abc_">x</span>'
-    span = shipped(html).tree.css_first("span")
+    span = one(shipped(html).tree, "span")
     assert span.attributes["itemid"] == "react-root-7a3b2c"
     assert span.attributes["itemprop"] == "css-1abc2d"
     assert span.attributes["about"] == "_R_abc_"
@@ -263,9 +264,9 @@ def test_the_input_tree_is_untouched_and_the_output_deterministic() -> None:
 def test_a_placeholder_rule_is_toggleable_like_any_other() -> None:
     html = b'<p id="react-root-7a3b2c" class="css-1abc2d keep">x</p>'
     off = NormalizationConfig(disabled_rules=frozenset({"id.hex_suffix", "class.emotion"}))
-    kept = apply_rules(parse(html), BUILTIN_RULES, off).tree.css_first("p")
+    kept = one(apply_rules(parse(html), BUILTIN_RULES, off).tree, "p")
     assert kept.attributes["id"] == "react-root-7a3b2c"
     assert kept.attributes["class"] == "css-1abc2d keep"
-    on = shipped(html).tree.css_first("p")
+    on = one(shipped(html).tree, "p")
     assert on.attributes["id"] == f"react-root-{PLACEHOLDER}"
     assert on.attributes["class"] == f"{PLACEHOLDER} keep"
