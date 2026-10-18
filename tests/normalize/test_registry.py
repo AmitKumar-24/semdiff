@@ -19,6 +19,7 @@ from semdiff.normalize import (
 )
 from semdiff.normalize.registry import (
     BUILTIN_RULES,
+    _apply_attributes,
     _fusable,
     _protected_text_nodes,
     _runs,
@@ -404,6 +405,71 @@ def test_a_rule_whose_attribute_an_earlier_rule_removed_reports_nothing() -> Non
     second = rule("test.fused.id2", target=Target.ATTRIBUTE, pattern=r"^gone$", attributes=frozenset({"id"}), phase=21)
     result = apply_rules(parse(b'<p id="gone">x</p>'), make_registry(first, second), NormalizationConfig())
     assert [a.rule_id for a in result.applied_rules] == ["test.fused.id1"]
+
+
+# --- the per-element attribute snapshot (T-26) -----------------------------------------------
+# The fused run reads an element's attributes once and hands the same pairs to every rule of the
+# run, re-reading only when a rule reports an application. These two pin the re-read: the first
+# through the engine, the second by showing what a stale snapshot would do instead.
+
+REMOVER = rule("test.snapshot.remove", target=Target.ATTRIBUTE, pattern=r"^abc$",
+               attributes=frozenset({"data-token"}), phase=12)
+WIDE = rule("test.snapshot.any", target=Target.ATTRIBUTE, pattern=r"^abc$",
+            attributes=frozenset(), phase=13)
+SNAPSHOT_HTML = b'<p data-token="abc" id="keep">x</p>'
+
+
+def test_a_later_rule_in_the_run_sees_the_attribute_an_earlier_one_removed() -> None:
+    """The invalidating case, end to end: the first rule deletes ``data-token``, so the second
+    -- which names no attributes and would otherwise match that same value -- must be offered
+    the element without it. The run is one run, so both rules share one snapshot."""
+    registry = make_registry(REMOVER, WIDE)
+    assert [len(run) for run in _runs(registry.effective(NormalizationConfig()))] == [2]
+    result = apply_rules(parse(SNAPSHOT_HTML), registry, NormalizationConfig())
+    assert [(a.rule_id, a.before, a.after) for a in result.applied_rules] == [
+        ("test.snapshot.remove", "abc", "")
+    ]
+    assert "data-token" not in one(result.tree, "p").attributes
+    assert one(result.tree, "p").attributes["id"] == "keep"
+    assert records(result) == records(
+        apply_rules_per_rule(parse(SNAPSHOT_HTML), registry, NormalizationConfig())
+    )
+
+
+def test_a_stale_attribute_snapshot_would_change_the_result() -> None:
+    """Anti-vacuity for the re-read: feed the second rule the snapshot taken before the first
+    rule ran and the engine stops being correct in two distinct ways.
+
+    A stale *value* is reported as ``before`` and written back, undoing the earlier rule; a
+    stale *name* makes the deletion raise, because the attribute is already gone. Both are
+    reached here by calling ``_apply_attributes`` with the pairs the fused run would have
+    reused had it not re-read them.
+    """
+    tree = LexborHTMLParser('<p class="a-1 b-1 keep">x</p>')
+    node = one(tree, "p")
+    stale = sorted(node.attributes.items())
+    assert [(a.before, a.after) for a in _apply_attributes(CLASS_A, node, stale)] == [
+        ("a-1 b-1 keep", "b-1 keep")
+    ]
+    # the mutant: b reports the pre-a value and writes the stripped token back
+    assert [(a.before, a.after) for a in _apply_attributes(CLASS_B, node, stale)] == [
+        ("a-1 b-1 keep", "a-1 keep")
+    ]
+    assert one(tree, "p").attributes["class"] == "a-1 keep"
+    # the engine re-reads instead, so the same two rules in one run report the real values
+    result = apply_rules(parse(TWO_ELEMENTS), make_registry(CLASS_A, CLASS_B), NormalizationConfig())
+    assert [(a.before, a.after) for a in result.applied_rules] == [
+        ("a-1 b-1 keep", "b-1 keep"), ("a-2 b-2", "b-2"), ("b-1 keep", "keep"), ("b-2", "")
+    ]
+
+    gone = LexborHTMLParser(SNAPSHOT_HTML.decode())
+    element = one(gone, "p")
+    stale_names = sorted(element.attributes.items())
+    assert [a.rule_id for a in _apply_attributes(REMOVER, element, stale_names)] == [
+        "test.snapshot.remove"
+    ]
+    with pytest.raises(KeyError):  # the attribute the snapshot still lists is already deleted
+        _apply_attributes(WIDE, element, stale_names)
 
 
 def test_a_dropped_node_is_never_offered_to_a_later_attribute_rule() -> None:

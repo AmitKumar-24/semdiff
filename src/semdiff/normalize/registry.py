@@ -143,6 +143,13 @@ def _apply_attribute_rules(
     could record different hashes for the same rewrite (F-030). Reporting stays rule-major: each
     application is collected with its rule's position and the document order it was made in,
     then sorted back.
+
+    Each element's attributes are read once for the whole run rather than once per rule
+    (T-26). ``_apply_attributes`` opens by building and sorting ``node.attributes``, which is a
+    fresh dict on every access, and the builtin run offers 204,256 (element, rule) pairs over
+    35,102 elements on the corpus while only 4,168 of them change anything. The snapshot can
+    only go stale through an application by an earlier rule of this same run — the pass is
+    node-local, so nothing else can touch this element — which is exactly when it is re-read.
     """
     if tree.root is None:
         return []
@@ -163,8 +170,12 @@ def _apply_attribute_rules(
         candidates = set(wildcard)
         for name in names:
             candidates.update(positions.get(name, ()))
+        items = sorted(names.items())
         for position in sorted(candidates):
-            for application in _apply_attributes(rules[position], node):
+            applications = _apply_attributes(rules[position], node, items)
+            if applications:
+                items = sorted(node.attributes.items())  # this rule changed it: read it again
+            for application in applications:
                 collected.append((position, order, application))
                 order += 1
     collected.sort(key=lambda item: (item[0], item[1]))
@@ -238,14 +249,26 @@ def _replacement(rule: NormalizationRule) -> str:
     return PLACEHOLDER if rule.action is Action.REPLACE_WITH_PLACEHOLDER else ""
 
 
-def _apply_attributes(rule: NormalizationRule, node: LexborNode) -> list[RuleApplication]:
+def _apply_attributes(
+    rule: NormalizationRule,
+    node: LexborNode,
+    items: list[tuple[str, str | None]] | None = None,
+) -> list[RuleApplication]:
     """One attribute rule against one element. The two actions differ only in what replaces the
-    match, and in whether an attribute whose whole value matched survives (T-18)."""
+    match, and in whether an attribute whose whole value matched survives (T-18).
+
+    ``items`` is the element's ``(name, value)`` pairs, sorted, which the fused run reuses
+    across the rules of one run (T-26). Omitting it reads them here, which is what the one
+    pass per rule path does and what this function did before the parameter existed. A caller
+    that supplies them owns their freshness: they must be the node's attributes as of now,
+    because a stale pair would be reported as ``before`` and, for a deleted attribute, would
+    make the removal below raise.
+    """
     out: list[RuleApplication] = []
     if rule.where is not None and not rule.where.matches(node):
         return out
     replacement = _replacement(rule)
-    for name, value in sorted(node.attributes.items()):
+    for name, value in sorted(node.attributes.items()) if items is None else items:
         if name in PROTECTED_ATTRIBUTES or (rule.attributes and name not in rule.attributes):
             continue
         before = value or ""

@@ -58,12 +58,21 @@ The smallest useful release. No diffing at all.
 | T-21 | **Gate:** noise-only corpus → normalized outputs byte-identical | T-19, T-23, T-04 | All 20 pairs identical after normalization |
 | T-22 | Baseline comparison: same 20 pairs through `lxml.html.diff` and `difflib` | T-21 | Published table of their change counts vs SemDiff's 0/20 |
 | T-24 | **Gate:** recall — meaningful changes survive normalization, on the same 20 corpus documents | T-19, T-21, T-04 | Every mutation class is visible after `normalize()` on every document it applies to, and every noise control still normalizes identically |
+| T-25 | Parser-version compatibility: adapt to selectolax 1.0, report the parser build beside `config_hash` | T-19, T-21 | 0.4.13 and 1.0.0 give identical normalized output and identical application records on all 40 snapshots; CI runs both exactly |
+| T-26 | Normalization overhead: one attribute snapshot per element per fused run | T-12, T-21 | Output and every record field unchanged on all 40 snapshots, `node_hash` included, against both the shipped engine and the per-rule reference |
 
 T-24 is T-21's other half. T-21 proves normalization stays quiet on twenty unchanged pages;
 T-24 proves it still speaks when something real changes, by mutating those same captures in
 memory — one surgical edit per case — and asserting the edit survives *as itself*. The
 mutations are synthetic, which `docs/BASELINE.md` states plainly: they are not a substitute for
 a captured real-change corpus (NFR-5), which does not exist yet.
+
+**T-25 is done** (`9837b1d`, CI green on Python 3.11–3.13 against selectolax 0.4.13 and 1.0.0):
+the `<1.0` pin is lifted, the two parser lines produce identical normalized output and
+identical application records, and `tests/corpus/parser_contract.json` is what keeps them that
+way — the corpus gates cannot see a parser change, because each compares two documents under
+the same parser (F-027, D-046). T-26 follows it and is pure overhead work: no rule, id, version,
+phase or `config_hash` moves, and the only thing that may change is how long a run takes.
 
 **Release v0.1.** T-22 is the marketing asset, not an afterthought — "here are 20 real page pairs that did not change, where a raw diff flags all 20 and this flags none" is the entire pitch. Measured, not asserted: `docs/BASELINE.md`. The claim is a false-positive rate, not a change volume — the baselines report one to three changes per pair, not hundreds (F-028). Publish the runtime column with it: SemDiff is ~3x slower than `lxml.html.diff` on the same pairs (~5x before the normalization-overhead work; NFR-3's 100 ms is still not met). Post it where changedetection.io and urlwatch users are.
 
