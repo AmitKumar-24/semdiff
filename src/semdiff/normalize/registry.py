@@ -15,7 +15,7 @@ from collections.abc import Iterable
 from selectolax.lexbor import LexborHTMLParser, LexborNode
 
 from semdiff.config import NormalizationConfig
-from semdiff.locator import Locator
+from semdiff.locator import Locator, PathCache
 from semdiff.normalize.model import (
     PLACEHOLDER,
     Action,
@@ -163,6 +163,7 @@ def _apply_attribute_rules(
             wildcard.append(position)
     collected: list[tuple[int, int, RuleApplication]] = []
     order = 0
+    cache = PathCache()  # safe for the whole run: an attribute rule never reshapes the tree
     for node in tree.root.traverse():
         names = node.attributes if node.is_element_node else {}
         if not names:
@@ -172,7 +173,7 @@ def _apply_attribute_rules(
             candidates.update(positions.get(name, ()))
         items = sorted(names.items())
         for position in sorted(candidates):
-            applications = _apply_attributes(rules[position], node, items)
+            applications = _apply_attributes(rules[position], node, items, cache)
             if applications:
                 items = sorted(node.attributes.items())  # this rule changed it: read it again
             for application in applications:
@@ -191,18 +192,29 @@ def _apply(rule: NormalizationRule, tree: LexborHTMLParser) -> Iterable[RuleAppl
     nodes = list(tree.root.traverse(include_text=True)) if tree.root is not None else []
     if rule.target is Target.TEXT:
         protected = _protected_text_nodes(tree)
+        cache = PathCache()  # text replacement frees text nodes; every element stays put
         return [
             a
             for node in nodes
             if node.tag == "-text" and node not in protected
-            for a in _apply_text(rule, node)
+            for a in _apply_text(rule, node, cache)
         ]
     if rule.target is Target.NODE:
+        # Deliberately uncached: this is the one pass that destroys elements, and a path cache
+        # keyed by node address must not outlive the nodes it keyed (T-27, F-032).
         return [a for node in nodes if node.is_element_node for a in _apply_node(rule, node)]
-    return [a for node in nodes if node.is_element_node for a in _apply_attributes(rule, node)]
+    attributes = PathCache()  # an attribute rule cannot reshape the tree either
+    return [
+        a
+        for node in nodes
+        if node.is_element_node
+        for a in _apply_attributes(rule, node, cache=attributes)
+    ]
 
 
-def _apply_text(rule: NormalizationRule, node: LexborNode) -> list[RuleApplication]:
+def _apply_text(
+    rule: NormalizationRule, node: LexborNode, cache: PathCache | None = None
+) -> list[RuleApplication]:
     before = node.text_content or ""
     if not rule.matcher.matches(before):
         return []
@@ -210,7 +222,7 @@ def _apply_text(rule: NormalizationRule, node: LexborNode) -> list[RuleApplicati
     after = rule.matcher.sub(before, replacement)
     if replacement and after == before:
         return []  # already the sentinel: a second pass must change nothing (idempotence)
-    locator = Locator.for_node(node)
+    locator = Locator.for_node(node, cache)
     node.replace_with(after)
     return [RuleApplication(rule.id, locator, before, after)]
 
@@ -253,6 +265,7 @@ def _apply_attributes(
     rule: NormalizationRule,
     node: LexborNode,
     items: list[tuple[str, str | None]] | None = None,
+    cache: PathCache | None = None,
 ) -> list[RuleApplication]:
     """One attribute rule against one element. The two actions differ only in what replaces the
     match, and in whether an attribute whose whole value matched survives (T-18).
@@ -299,7 +312,7 @@ def _apply_attributes(
             after = " ".join(kept)
             if after == before or len(kept) == len(before.split()):
                 continue
-        locator = Locator.for_node(node)
+        locator = Locator.for_node(node, cache)
         if after == "" and rule.target is not Target.ATTRIBUTE_SUBSTRING:
             del node.attrs[name]  # STRIP loses attribute presence; the placeholder keeps it (T-18)
         else:

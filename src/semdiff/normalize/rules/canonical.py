@@ -13,7 +13,7 @@ import re
 
 from selectolax.lexbor import LexborHTMLParser, LexborNode
 
-from semdiff.locator import Locator
+from semdiff.locator import Locator, PathCache
 from semdiff.normalize.model import (
     Action,
     NormalizationRule,
@@ -73,8 +73,9 @@ def strip_comments(rule: NormalizationRule, tree: LexborHTMLParser) -> list[Rule
     start = _document(tree)
     if start is None:
         return out
+    cache = PathCache()  # comments and text go; the elements a path is made of do not
     for node in [n for n in start.traverse(include_text=True) if n.tag == "-comment"]:
-        out.append(RuleApplication(rule.id, Locator.for_node(node), node.html or "", ""))
+        out.append(RuleApplication(rule.id, Locator.for_node(node, cache), node.html or "", ""))
         node.decompose()
     if tree.root is not None:
         tree.root.merge_text_nodes()  # text split only by a removed comment becomes one node again
@@ -85,6 +86,7 @@ def collapse_whitespace(rule: NormalizationRule, tree: LexborHTMLParser) -> list
     out: list[RuleApplication] = []
     if tree.root is None:
         return out
+    cache = PathCache()  # text nodes are replaced or dropped; no element moves
     for node in [n for n in tree.root.traverse(include_text=True) if n.tag == "-text"]:
         if _under_preserved(node):
             continue
@@ -102,7 +104,7 @@ def collapse_whitespace(rule: NormalizationRule, tree: LexborHTMLParser) -> list
                 after = after.rstrip(" ")
         if after == before:
             continue
-        locator = Locator.for_node(node)
+        locator = Locator.for_node(node, cache)
         if after:
             node.replace_with(after)
         else:
@@ -136,6 +138,7 @@ def sort_attributes(rule: NormalizationRule, tree: LexborHTMLParser) -> list[Rul
     out: list[RuleApplication] = []
     if tree.root is None:
         return out
+    cache = PathCache()  # attribute order only: the tree's shape is untouched
     for node in [n for n in tree.root.traverse() if n.is_element_node]:
         if len(node.attributes) < 2:
             continue  # nothing to reorder, and _serialized_names would serialize the subtree
@@ -145,7 +148,7 @@ def sort_attributes(rule: NormalizationRule, tree: LexborHTMLParser) -> list[Rul
         ordered = sorted(names, key=str.lower)
         if names == ordered:
             continue
-        locator = Locator.for_node(node)
+        locator = Locator.for_node(node, cache)
         # Keyed by the lowercase name, because the key the parser reports may be spelled either
         # way (F-027); ``spelled`` maps back to whatever this parser actually used, which is the
         # only key a deletion will accept. What goes back in is the start tag's own spelling.

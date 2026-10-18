@@ -150,16 +150,18 @@ not rot.
 | the protected text-node set is precomputed once per rule pass | an ancestor walk per text node per TEXT rule | 3.40× on the TEXT passes, 24.4 ms per document |
 | consecutive attribute rules share one name-indexed traversal | one traversal and one call per element per rule, 20 of them | 1.37× on `apply_rules`, 26.4 ms per document, 25% of `normalize()` |
 | each element's attributes are read once per fused run (T-26) | `sorted(node.attributes.items())` rebuilt inside every call: 204,256 (element, rule) pairs over 35,102 elements, of which 4,168 change anything | 1.10× and 1.11× on `apply_rules` in two runs, 166–204 ms corpus-wide, ≈5 ms per snapshot, ≈9 ms per pair |
+| element css paths are cached per pass, keyed by `mem_id` (T-27) | a walk to the root per application, counting previous siblings at every level: ~14 parent hops but ~114 sibling hops per call, once per application | **1.12× median, 1.13× min** on `apply_rules` over 11 alternating rounds, 192 ms corpus-wide, ≈5 ms per snapshot, ≈10 ms per pair — **machine-dependent, measured on Windows 11, Python 3.12.10, selectolax 0.4.11**, and too small for the end-to-end table above to resolve |
 
-Not one of the four touches a rule, an id, a version, a phase or the `config_hash`. Each was
+Not one of the five touches a rule, an id, a version, a phase or the `config_hash`. Each was
 checked for exactness before it was timed, on all 40 corpus snapshots: byte-identical
 serialized trees and identical application records, locators included. For the third that check
 is now a test rather than a script — `tests/corpus/test_fused_attribute_equivalence.py`, one
 case per snapshot, against the pre-fusion engine kept in `tests/normalize/reference.py` — and
-the fourth is checked against that same reference and against the engine as it shipped at
-`9837b1d`, 23,204 records with `node_hash` included and zero differing fields.
+the fourth and fifth are checked against that same reference and against the engine as it
+shipped at `9837b1d` and `472e322` respectively, 23,204 records with `node_hash` included
+and zero differing fields — for the fifth, on selectolax 0.4.11, 0.4.13 and 1.0.0 alike.
 
-**Every figure in that table is machine-dependent**, including the fourth row. They are
+**Every figure in that table is machine-dependent**, including the fourth and fifth rows. They are
 interleaved A/B ratios, which is what survives load drift; the millisecond totals beside them
 are from one laptop that was not idle and should be read as the size of the effect on that
 machine, not as a number another machine will reproduce. The published benchmark table above

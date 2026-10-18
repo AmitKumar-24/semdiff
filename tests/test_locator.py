@@ -12,7 +12,7 @@ import re
 
 from selectolax.lexbor import LexborHTMLParser, LexborNode
 
-from semdiff.locator import Locator
+from semdiff.locator import Locator, PathCache, _css_path
 from tests.nodes import one
 
 NESTED = '<div id="outer" class="a"><p id="inner" class="b">text</p></div>'
@@ -121,3 +121,71 @@ def test_identical_elements_in_different_places_share_a_fingerprint() -> None:
     first, second = tree.css("p")
     assert Locator.for_node(first).node_hash == Locator.for_node(second).node_hash
     assert Locator.for_node(first).css != Locator.for_node(second).css
+
+# --- the pass-scoped path cache (T-27, F-032) ------------------------------------------------
+# The cache is keyed by ``mem_id``, the DOM node's address, because a node-keyed dict pays
+# ``LexborNode.__eq__`` and that cost grows with the subtree. An address is only an identity
+# while the node is alive, so what these pin is the agreement with the uncached walk and the
+# lifetime the agreement depends on.
+
+SHIFTING = '<div><p id="a">x</p><aside>drop me</aside><p id="b">z</p></div>'
+
+
+def test_the_cache_agrees_with_the_walk_on_every_element() -> None:
+    tree = tree_of('<div><p>a</p><section><span>b</span><span>c</span></section><p>d</p></div>')
+    assert tree.root is not None
+    elements = [n for n in tree.root.traverse() if n.is_element_node]
+    assert len(elements) == 9  # html, head, body, div, p, section, span, span, p
+    cache = PathCache()
+    assert [cache.path(n) for n in elements] == [_css_path(n) for n in elements]
+
+
+def test_the_cache_agrees_with_the_walk_on_text_and_comment_nodes() -> None:
+    """Both resolve to the parent element before a path is asked for, so both must match."""
+    tree = tree_of("<div><p>one</p><!-- two --><p>three</p></div>")
+    assert tree.root is not None
+    cache = PathCache()
+    for node in tree.root.traverse(include_text=True):
+        assert Locator.for_node(node, cache) == Locator.for_node(node)
+
+
+def test_a_second_lookup_returns_the_same_path() -> None:
+    tree = tree_of(SHIFTING)
+    cache = PathCache()
+    second = tree.css("p")[1]
+    assert cache.path(second) == cache.path(second) == _css_path(second)
+
+
+def test_the_cache_is_what_makes_a_sibling_cheap() -> None:
+    """The ancestors are shared, so the second sibling must not re-walk them: its entry is
+    added, and every ancestor is already there from the first."""
+    tree = tree_of(SHIFTING)
+    cache = PathCache()
+    first, second = tree.css("p")[0], tree.css("p")[1]
+    cache.path(first)
+    cached_after_first = dict(cache._paths)
+    cache.path(second)
+    added = set(cache._paths) - set(cached_after_first)
+    assert added == {second.mem_id}
+
+
+def test_a_cache_that_outlives_a_structural_change_goes_stale() -> None:
+    """Anti-vacuity for the lifetime rule. Dropping the ``<aside>`` moves the second ``<p>``
+    from the third child to the second, and a cache that survived the drop would keep saying
+    the old path — which is exactly why the engine builds one per pass and gives none to the
+    pass that can destroy an element.
+    """
+    tree = tree_of(SHIFTING)
+    cache = PathCache()
+    second = tree.css("p")[1]
+    before = cache.path(second)
+    assert before.endswith("p:nth-child(3)")
+
+    aside = one(tree, "aside")
+    aside.decompose()
+
+    assert cache.path(second) == before  # stale: the cache still answers from the old shape
+    fresh = _css_path(second)
+    assert fresh.endswith("p:nth-child(2)")
+    assert fresh != before
+    assert PathCache().path(second) == fresh  # a per-pass cache is right again

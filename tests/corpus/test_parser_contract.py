@@ -14,6 +14,14 @@ So this file pins the output itself, against digests recorded in `parser_contrac
 * the normalized bytes of all 40 snapshots, and
 * every application record **except** `node_hash` — rule id, before, after and locator path.
 
+The contract also covers something the engine now depends on that the parser never promised:
+`Locator.css` is computed through a per-pass cache keyed by `LexborNode.mem_id`, the DOM node's
+address (T-27, F-032). `mem_id` is an implementation detail with no documented stability
+guarantee -- if a future selectolax reused an address within a pass, or changed what `mem_id`
+returns, the first thing to move would be a `css` value, and `css` is pinned here for every
+record of all 40 snapshots. These digests are the detector; they are not to be re-recorded to
+make a failure go away.
+
 `node_hash` is deliberately outside the contract. It fingerprints the node's own attributes
 (D-044) including the spelling of their names, so the same document yields a different hash
 for a `<svg>` on 0.4.x and on 1.0.0: 464 of 23,204 records, all on foreign content. Lowercasing

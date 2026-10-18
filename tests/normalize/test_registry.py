@@ -488,6 +488,51 @@ def test_a_dropped_node_is_never_offered_to_a_later_attribute_rule() -> None:
     assert [len(run) for run in _runs(registry.effective(NormalizationConfig()))] == [1, 1, 1]
 
 
+# --- the pass-scoped path cache (T-27) -------------------------------------------------------
+
+
+def test_a_drop_shifts_later_siblings_and_the_next_rule_reports_the_new_path() -> None:
+    """The lifetime boundary the cache depends on, driven through the engine.
+
+    ``_css_path`` is cached per pass and keyed by the node's address, so a cache that outlived
+    a pass which destroys an element would answer from the old shape. Dropping the ``<aside>``
+    moves the second ``<p>`` from the third child to the second, and the attribute rule that
+    runs afterwards -- in its own pass, with its own cache -- must report the new position.
+    ``_apply_node`` is given no cache at all, which is what makes the drop pass safe.
+    """
+    dropper = rule("test.cache.drop", target=Target.NODE, pattern=r"^aside$", action=Action.DROP_NODE,
+                   attributes=frozenset(), phase=30)
+    late = rule("test.cache.late", pattern=r"^a-1$", attributes=frozenset({"class"}), phase=50)
+    html = b'<div><p class="a-1">x</p><aside>drop me</aside><p class="a-1">z</p></div>'
+    registry = make_registry(dropper, late)
+    assert [len(run) for run in _runs(registry.effective(NormalizationConfig()))] == [1, 1]
+    result = apply_rules(parse(html), registry, NormalizationConfig())
+    paths = [a.locator.css or "" for a in result.applied_rules if a.rule_id == "test.cache.late"]
+    assert [path.rsplit(" > ", 1)[-1] for path in paths] == ["p", "p:nth-child(2)"]
+    assert records(result) == records(apply_rules_per_rule(parse(html), registry, NormalizationConfig()))
+
+
+def test_every_pass_builds_its_own_cache() -> None:
+    """Two attribute rules separated by a drop cannot share one, because they are three passes.
+
+    Pinned as behaviour rather than as a count of caches: the records must equal one pass per
+    rule, which is the engine that has no cache at all.
+    """
+    early = rule("test.cache.early", pattern=r"^a-1$", attributes=frozenset({"class"}), phase=10)
+    dropper = rule("test.cache.drop2", target=Target.NODE, pattern=r"^aside$", action=Action.DROP_NODE,
+                   attributes=frozenset(), phase=30)
+    late = rule("test.cache.late2", pattern=r"^b-1$", attributes=frozenset({"class"}), phase=50)
+    html = (
+        b'<section><p class="a-1 b-1">x</p><aside>gone</aside>'
+        b'<p class="a-1 b-1">y</p><span class="b-1">z</span></section>'
+    )
+    registry = make_registry(early, dropper, late)
+    doc = parse(html)
+    assert records(apply_rules(doc, registry, NormalizationConfig())) == records(
+        apply_rules_per_rule(parse(html), registry, NormalizationConfig())
+    )
+
+
 def test_nested_elements_get_the_same_provenance_from_either_engine() -> None:
     """F-030, closed by D-044. The fused pass visits a node once; one pass per rule finishes each
     rule over the whole document first. So when a descendant is rewritten by an *earlier* rule of

@@ -60,6 +60,7 @@ The smallest useful release. No diffing at all.
 | T-24 | **Gate:** recall — meaningful changes survive normalization, on the same 20 corpus documents | T-19, T-21, T-04 | Every mutation class is visible after `normalize()` on every document it applies to, and every noise control still normalizes identically |
 | T-25 | Parser-version compatibility: adapt to selectolax 1.0, report the parser build beside `config_hash` | T-19, T-21 | 0.4.13 and 1.0.0 give identical normalized output and identical application records on all 40 snapshots; CI runs both exactly |
 | T-26 | Normalization overhead: one attribute snapshot per element per fused run | T-12, T-21 | Output and every record field unchanged on all 40 snapshots, `node_hash` included, against both the shipped engine and the per-rule reference |
+| T-27 | Provenance overhead: element css paths cached per pass, keyed by `mem_id` | T-12, T-21, T-25 | All 40 snapshots byte-identical and all 23,204 application records equal field for field — against the engine at `472e322` and against the per-rule reference, on selectolax 0.4.11, 0.4.13 and 1.0.0 |
 
 T-24 is T-21's other half. T-21 proves normalization stays quiet on twenty unchanged pages;
 T-24 proves it still speaks when something real changes, by mutating those same captures in
