@@ -170,7 +170,7 @@ of them can invent a change — and each was accepted rather than engineered aro
 pip install -e ".[dev]"
 ```
 
-Requires Python 3.11+. Runtime dependencies: `selectolax`, `lxml`, `extruct`, `pydantic`.
+Requires Python 3.11+. Runtime dependencies: `selectolax`, `lxml`, `pydantic`.
 Both selectolax lines are supported and tested: CI runs 0.4.13 and 1.0.0 against every
 Python version, plus a weekly job on whatever is newest.
 

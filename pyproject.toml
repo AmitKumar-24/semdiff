@@ -31,7 +31,6 @@ dependencies = [
     # a result names its parser build (D-046).
     "selectolax>=0.4.11",
     "lxml",
-    "extruct",
     "pydantic>=2",
 ]
 
