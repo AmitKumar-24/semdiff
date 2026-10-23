@@ -1,19 +1,34 @@
 [build-system]
-requires = ["hatchling>=1.25"]
+# Pinned exactly, not floored. An unpinned backend makes the emitted `Metadata-Version` a
+# property of the build machine rather than of the commit: 1.32.4 emits Metadata-Version 2.5
+# with PEP 639 `License-Expression: Apache-2.0`, which `twine check --strict` accepts. Bumping
+# this pin is a deliberate act and its effect on the metadata is re-checked (D-050).
+requires = ["hatchling==1.32.4"]
 build-backend = "hatchling.build"
 
 [project]
 name = "semdiff"
-version = "0.0.0"
+# One source of truth: Hatchling reads the version out of `src/semdiff/__init__.py`, so the
+# number is never written twice (D-050, `[tool.hatch.version]` below).
+dynamic = ["version"]
 description = "Semantic HTML change detection: two snapshots in, typed change objects out."
 readme = "README.md"
 license = "Apache-2.0"
 license-files = ["LICENSE"]
 authors = [{ name = "AmitKumar-24" }]
-requires-python = ">=3.11"
+requires-python = ">=3.11"  # D-003, superseding NFR-9's original "3.10+"
+keywords = [
+    "html",
+    "diff",
+    "normalization",
+    "change-detection",
+    "web-monitoring",
+    "scraping",
+]
 classifiers = [
-    "Development Status :: 1 - Planning",
+    "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -33,9 +48,20 @@ dependencies = [
     "pydantic>=2",
 ]
 
+[project.urls]
+Homepage = "https://github.com/AmitKumar-24/semdiff"
+Repository = "https://github.com/AmitKumar-24/semdiff"
+Issues = "https://github.com/AmitKumar-24/semdiff/issues"
+
 [project.scripts]
 semdiff = "semdiff.cli:main"
 
+# The public extras surface, frozen here by the first upload (Q-01, resolved at D-050): two
+# feature extras, their union, and `dev`. `content` and `ml` are declared ahead of the layers
+# that import them -- trafilatura scoping is FR-14/T-81, the ML provider is T-91 -- so
+# installing either today adds a dependency and no capability. The names are fixed now anyway,
+# because an extra someone has written into a requirements file cannot be renamed afterwards.
+# `all` is the union of the feature extras and never carries `dev`.
 [project.optional-dependencies]
 content = ["trafilatura"]
 ml = ["sentence-transformers"]
@@ -46,11 +72,34 @@ all = ["semdiff[content,ml]"]
 # backend, which FR-2 reserves and D-048 deferred out of v0.1.
 dev = ["pytest", "mypy", "lxml"]
 
+[tool.hatch.version]
+path = "src/semdiff/__init__.py"
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/semdiff"]
 
+# F-004, resolved at D-050: the sdist carries the code plus the evidence the README sends
+# readers to -- FINDINGS.md and docs/DECISIONS.md -- and nothing that is neither. Out go
+# `.gitattributes`, `scripts/` (a URL-fetching capture tool has no business in a distribution
+# that guarantees no network I/O), and the working agreement, which is instructions to a
+# contributor rather than evidence about the library. `.gitignore` is listed below and ships
+# anyway; see the note on that line. `tests/` and `corpus/` stay out too: the
+# suite needs both, so a downstream packager cannot run the tests from the sdist. That cost is
+# accepted for v0.1 and recorded rather than discovered.
 [tool.hatch.build.targets.sdist]
-exclude = ["corpus/", "tests/", ".github/"]
+exclude = [
+    "corpus/",
+    "tests/",
+    ".github/",
+    # Inert at hatchling 1.32.4 and kept to record the intent: the sdist builder
+    # force-includes the VCS ignore files it used for its own exclusions
+    # (`get_default_build_data`), and a force-include outranks this list. Measured, not
+    # assumed -- `scripts/check_sdist.py` tolerates this one file and nothing else.
+    ".gitignore",
+    ".gitattributes",
+    "scripts/",
+    "docs/CLAUDE_CODE_INSTRUCTIONS.md",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

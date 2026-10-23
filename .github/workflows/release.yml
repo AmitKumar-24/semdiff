@@ -1,0 +1,57 @@
+name: Release
+
+# Tag-triggered only. Pushing a `v*` tag builds the artifacts, checks them, and publishes to
+# PyPI through Trusted Publishing (D-050). Until a trusted publisher is configured for the
+# `semdiff` project on PyPI, the publish job fails at the upload step and nothing is released;
+# the build job is useful on its own and is what `workflow_dispatch` is for.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install the build tools
+        run: python -m pip install build twine
+      - name: Build sdist and wheel
+        run: python -m build
+      - name: Check the metadata
+        run: python -m twine check --strict dist/*
+      - name: Verify the sdist contents (F-004, D-050)
+        run: python scripts/check_sdist.py dist/*.tar.gz
+      - name: The tag must match the package version
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          python -m pip install dist/*.whl
+          version=$(python -c "import semdiff; print(semdiff.__version__)")
+          tag="${GITHUB_REF_NAME#v}"
+          echo "tag $tag, package $version"
+          test "$tag" = "$version"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      # Trusted Publishing: PyPI verifies this workflow's OIDC token, so no API token is
+      # stored in the repository. The publisher has to be configured on PyPI first.
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1

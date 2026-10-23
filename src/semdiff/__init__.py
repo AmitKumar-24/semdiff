@@ -11,7 +11,7 @@ from semdiff.errors import (
 from semdiff.normalize.api import normalize
 from semdiff.parse import PARSER_ID, PARSER_VERSION, ParsedDoc, parse, parser_fingerprint
 
-__version__ = "0.0.0"
+__version__ = "0.1.0"  # the one source; Hatchling reads it at build time (D-050)
 
 __all__ = [
     "PARSER_ID",
