@@ -51,7 +51,7 @@ If `docs/` is missing or incomplete, say so and stop. Do not reconstruct the des
 Violating any of these is a failed task, regardless of whether tests pass.
 
 1. **No unrelated changes.** No opportunistic refactors, reformatting, renames, dependency bumps, or drive-by fixes. If you spot something worth changing, add it to a `FINDINGS.md` list and mention it in your report. Do not act on it.
-2. **No new dependencies without approval.** The core install is `selectolax`, `lxml`, `pydantic` -- what the shipped layers import, plus `lxml`, reserved by FR-2 for the second parser backend (NFR-2, D-047). Nothing else. `extruct` arrives with the extraction layer (T-38), `trafilatura` lives behind `[content]`, ML behind `[ml]`.
+2. **No new dependencies without approval.** The core install is `selectolax`, `pydantic` — what the shipped layers import, with no exceptions (NFR-2, D-047, D-048). Nothing else. `lxml` is a `[dev]` dependency, needed only by `tests/baseline` (T-22), and returns to the core install with the second parser backend (FR-2, T-11, deferred). `extruct` arrives with the extraction layer (T-38), `trafilatura` lives behind `[content]`, ML behind `[ml]`.
 3. **No network, clock, randomness, or model calls in the core diff path.** This is the determinism contract (NFR-1) and the project's differentiator. A `datetime.now()` or a `requests.get()` in `semdiff/` core is a failed task.
 4. **No ML in the core.** ML is a pluggable provider behind an interface, with a deterministic default. The library must run fully with a core-only install.
 5. **Never change the output schema without explicit approval.** `schema_version` is a public contract. `xmldiff`'s unstable output across versions is a documented adoption blocker we are deliberately avoiding.
@@ -126,7 +126,7 @@ From `docs/domain-model.md`. These are the model's contract. Each one needs a te
 
 | Concern | Use | Never build |
 |---|---|---|
-| Parsing | `selectolax` (Lexbor) default, `lxml` for XPath | A parser |
+| Parsing | `selectolax` (Lexbor); `lxml` for XPath (T-11) | A parser |
 | Structured data | `extruct` (JSON-LD, Microdata, RDFa) | A microdata parser |
 | Main content | `trafilatura` behind `[content]` | Density heuristics |
 | Noise rules | EasyList / EasyPrivacy lists | Ad-detection heuristics |

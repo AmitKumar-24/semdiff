@@ -43,11 +43,11 @@ Each layer receives the previous layer's output plus an immutable `Config`. Noth
 **In:** `bytes | str`, optional source URL, optional declared encoding.
 **Out:** `ParsedDoc` — tree handle, detected encoding, parser identity, source URL for provenance.
 
-**Dependencies:** `selectolax` (Lexbor) as default; `lxml` selectable when full XPath is needed downstream.
+**Dependencies:** `selectolax` (Lexbor) — in v0.1 the only backend shipped and this layer's only dependency. `lxml` is the intended second backend, selectable when full XPath is needed downstream, and arrives with the Phase 2 provenance work (T-11, deferred at D-048); until then `parser="lxml"` raises and lxml is not a dependency of this layer.
 
 **Build vs reuse — reuse.** Parsing is solved and selectolax is decisively faster: 2.39s against lxml's 9.09s and BeautifulSoup's 61.02s across 754 domains. Nothing to gain by touching it.
 
-**Notes.** Two parser backends behind one interface, because provenance XPaths (FR-23) are easier with lxml while throughput favors Lexbor. No JS execution, no XML external entities, no outbound fetch. Client-side-injected JSON-LD is simply absent here, and Layer 3 reports it as absent rather than retrying over the network — the browser adapter is a v0.3 input concern, not a parser concern.
+**Notes.** Two parser backends behind one interface, because provenance XPaths (FR-23) are easier with lxml while throughput favors Lexbor. One of the two is built: v0.1 ships the Lexbor adapter alone, and what "the same interface" must guarantee across two backends is itself undecided (Q-08, F-034). No JS execution, no XML external entities, no outbound fetch. Client-side-injected JSON-LD is simply absent here, and Layer 3 reports it as absent rather than retrying over the network — the browser adapter is a v0.3 input concern, not a parser concern.
 
 ---
 
@@ -224,7 +224,7 @@ Plus a CLI: `semdiff old.html new.html --json` and `semdiff normalize file.html`
 
 | Layer | Decision | One-line reason |
 |---|---|---|
-| L0 Parse | Reuse selectolax/lxml | Solved; ~25× faster than BeautifulSoup |
+| L0 Parse | Reuse selectolax; lxml for XPath (T-11) | Solved; ~25× faster than BeautifulSoup |
 | L1 Normalize | **Build** | No existing differ has one; root cause of false positives |
 | L2 Noise | Reuse EasyList + trafilatura; build static-DOM adapter | Rules are battle-tested; existing engines assume a browser |
 | L3 Extract | Reuse extruct; build entity mapping + heuristics | Multi-syntax parsing mature; nothing covers markup-free pages |

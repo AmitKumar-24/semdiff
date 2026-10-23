@@ -5,9 +5,9 @@ over the network"; NFR-8 says no outbound requests. Both were true by inspection
 which is the weakest form of a safety claim — the README states it to users.
 
 **Why this is not a check on imports.** ``import semdiff`` already pulls in ``socket`` and
-``urllib.parse``, because pydantic imports them (and until T-30 a full install also carried
-``requests`` and ``urllib3`` through ``extruct`` — D-047 removed them from the core install,
-which changes the install rather than this reasoning). Asserting that no networking
+``urllib.parse``, because pydantic imports them (and until D-047 a full install also carried
+``requests`` and ``urllib3`` through ``extruct``, which that decision removed from the core
+install; that changes the install rather than this reasoning). Asserting that no networking
 module is loaded would therefore fail today while proving nothing: a module that is imported
 and never called opens no connection, and a module that is *not* imported can still be
 imported later by the code under test. So the guard watches the only thing that matters —

@@ -30,7 +30,6 @@ dependencies = [
     # What still differs between them is a Locator.node_hash on foreign content, which is why
     # a result names its parser build (D-046).
     "selectolax>=0.4.11",
-    "lxml",
     "pydantic>=2",
 ]
 
@@ -41,7 +40,11 @@ semdiff = "semdiff.cli:main"
 content = ["trafilatura"]
 ml = ["sentence-transformers"]
 all = ["semdiff[content,ml]"]
-dev = ["pytest", "mypy"]
+# lxml is a development dependency, not a core one: nothing under src/semdiff imports it, and
+# tests/baseline measures SemDiff against lxml.html.diff for the published comparison (T-22).
+# It returns to the core install with the release that first imports it -- the second parser
+# backend, which FR-2 reserves and D-048 deferred out of v0.1.
+dev = ["pytest", "mypy", "lxml"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/semdiff"]

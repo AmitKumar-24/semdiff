@@ -39,12 +39,13 @@ T-04 first, before any normalization code. It's the v0.1 gate, and writing the t
 
 ## Phase 1 — v0.1: Normalization, standalone
 
-The smallest useful release. No diffing at all.
+The smallest useful release. No diffing at all, and one parser backend: `parser="lxml"` raises
+`NotImplementedError` here, and T-11 sits in Phase 2c beside the provenance work that wants it
+(D-048).
 
 | ID | Task | Depends | Done when |
 |---|---|---|---|
 | T-10 | `ParsedDoc` + selectolax adapter | T-00 | Malformed HTML parses without raising |
-| T-11 | lxml adapter behind the same interface | T-10 | Both backends produce equivalent trees on corpus |
 | T-12 | `NormalizationRule` / `RuleApplication` types, phase-ordered registry | T-01 | Rules register, execute in fixed phase order, report applications |
 | T-13 | Rule family: dynamic classes (regex set: styled-components, Emotion, CSS Modules, utility hashes) | T-12 | Unit tests per generator pattern; each rule toggleable |
 | T-14 | Rule family: hashed IDs (pattern + entropy threshold) | T-12 | Catches `#react-root-7a3b2c`, leaves `#main-nav` alone |
@@ -61,6 +62,8 @@ The smallest useful release. No diffing at all.
 | T-25 | Parser-version compatibility: adapt to selectolax 1.0, report the parser build beside `config_hash` | T-19, T-21 | 0.4.13 and 1.0.0 give identical normalized output and identical application records on all 40 snapshots; CI runs both exactly |
 | T-26 | Normalization overhead: one attribute snapshot per element per fused run | T-12, T-21 | Output and every record field unchanged on all 40 snapshots, `node_hash` included, against both the shipped engine and the per-rule reference |
 | T-27 | Provenance overhead: element css paths cached per pass, keyed by `mem_id` | T-12, T-21, T-25 | All 40 snapshots byte-identical and all 23,204 application records equal field for field — against the engine at `472e322` and against the per-rule reference, on selectolax 0.4.11, 0.4.13 and 1.0.0 |
+| T-28 | Documented v0.1 limitations in the README (NFR-11) | T-19, T-21, T-24 | Fifteen limitations, each checked against the finding or decision behind it, in README between the guarantees and the install instructions |
+| T-29 | Network-I/O gate: the public path opens no outbound connection (FR-4, NFR-8) | T-19, T-21 | Socket entry points refuse during `normalize()` across all 40 snapshots and a bait document; what the gate does *not* cover is F-033 |
 
 T-24 is T-21's other half. T-21 proves normalization stays quiet on twenty unchanged pages;
 T-24 proves it still speaks when something real changes, by mutating those same captures in
@@ -74,6 +77,13 @@ identical application records, and `tests/corpus/parser_contract.json` is what k
 way — the corpus gates cannot see a parser change, because each compares two documents under
 the same parser (F-027, D-046). T-26 follows it and is pure overhead work: no rule, id, version,
 phase or `config_hash` moves, and the only thing that may change is how long a run takes.
+
+**T-28 and T-29 came out of release-readiness audits**, not out of this plan, which is why
+they were appended to the Phase-1 block rather than planned into it. T-28 is the v0.1 half
+of the limitations section; T-65 extends it at v0.2 with reorder robustness, ad filtering
+and entity typing. The block is now full at T-29, and T-30/T-31 already belong to Phase 2a,
+so later audit work is recorded by the decision that carries it rather than by a task id:
+the dependency-budget change is D-047 and the lxml deferral is D-048 (D-049 records why).
 
 **Release v0.1.** T-22 is the marketing asset, not an afterthought — "here are 20 real page pairs that did not change, where a raw diff flags all 20 and this flags none" is the entire pitch. Measured, not asserted: `docs/BASELINE.md`. The claim is a false-positive rate, not a change volume — the baselines report one to three changes per pair, not hundreds (F-028). Publish the runtime column with it: SemDiff is ~3x slower than `lxml.html.diff` on the same pairs (~5x before the normalization-overhead work; NFR-3's 100 ms is still not met). Post it where changedetection.io and urlwatch users are.
 
@@ -130,6 +140,7 @@ T-43 is the second standalone surface. Shipping `extract()` publicly costs nothi
 | T-54 | Classifier: `VALUE_DISCORDANCE` | T-41, D | Single-snapshot finding representable |
 | T-55 | Confidence table + `ConfidenceBasis`; score recomputable from basis alone | T-50..54 | Invariant 4 asserted; table frozen for `schema_version` |
 | T-56 | `Provenance` incl. `node_hash`, stage tagging, rule/removal ids | T-12, T-30 | Locator validity matches its stage |
+| T-11 | lxml adapter behind the same interface — moved here from Phase 1 (D-048) | T-10, Q-08 | Q-08 has said what backend equivalence means — structural, or byte-identical output — and the adapter meets it. Measured before the move: element paths agree on 40/40 snapshots, serialized output on 0/40 (F-034) |
 
 ### 2d — Output and release
 

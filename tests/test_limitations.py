@@ -58,7 +58,8 @@ CATALOGUE: tuple[Limitation, ...] = (
         key="lxml_backend",
         group="Not implemented",
         anchor='parser="lxml"',
-        must_say=("NotImplementedError", "selectolax", "T-11"),
+        must_say=("NotImplementedError", "selectolax", "T-11", "deferred"),
+        evidence=("D-048",),
     ),
     Limitation(
         key="user_rules",

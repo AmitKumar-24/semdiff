@@ -28,7 +28,7 @@ Where the engine can lean on structured data it does: Web Data Commons found str
 
 ## MVP (v0.1–v0.2)
 
-**v0.1 — normalization + baseline diff.** selectolax/lxml parsing adapters; the normalization layer (dynamic class and hashed-ID stripping, timestamp and token neutralization, tree canonicalization); a baseline diff emitting a minimal structured change list. Ship normalization as a standalone utility — it has value to monitoring users before any semantics land.
+**v0.1 — normalization + baseline diff.** The selectolax parsing adapter (lxml is Phase 2, T-11); the normalization layer (dynamic class and hashed-ID stripping, timestamp and token neutralization, tree canonicalization); a baseline diff emitting a minimal structured change list. Ship normalization as a standalone utility — it has value to monitoring users before any semantics land.
 
 Gate to proceed: on real page pairs where only classes, IDs, and timestamps changed, emit **zero** change objects, against the many that difflib and `lxml.html.diff` produce.
 

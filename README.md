@@ -105,7 +105,8 @@ observations, `docs/DECISIONS.md` for the decisions that accepted them.
 ### Not implemented
 
 - **One parser backend.** `parser="lxml"` raises `NotImplementedError`. selectolax (Lexbor) is
-  the only backend; the lxml adapter is T-11 and has not been built.
+  the only backend; the lxml adapter is T-11, deferred out of v0.1 to sit beside the provenance
+  work that wants it, with no equivalence between the two backends claimed (D-048).
 - **Rules are toggleable, not extensible.** Any shipped rule can be turned off or on through
   config, but no config field adds one. A custom rule means reaching past the public API into
   the registry, which is not a supported surface yet.
@@ -170,7 +171,8 @@ of them can invent a change — and each was accepted rather than engineered aro
 pip install -e ".[dev]"
 ```
 
-Requires Python 3.11+. Runtime dependencies: `selectolax`, `lxml`, `pydantic`.
+Requires Python 3.11+. Runtime dependencies: `selectolax`, `pydantic`. `lxml` is needed
+only by the baseline comparison in the test suite, so it lives in `[dev]`.
 Both selectolax lines are supported and tested: CI runs 0.4.13 and 1.0.0 against every
 Python version, plus a weekly job on whatever is newest.
 
