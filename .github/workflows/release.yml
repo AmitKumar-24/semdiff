@@ -1,21 +1,40 @@
 name: Release
 
-# Tag-triggered only. Pushing a `v*` tag builds the artifacts, checks them, and publishes to
-# PyPI through Trusted Publishing (D-050). Until a trusted publisher is configured for the
-# `semdiff` project on PyPI, the publish job fails at the upload step and nothing is released;
-# the build job is useful on its own and is what `workflow_dispatch` is for.
+# Tag-triggered. Pushing a `v*` tag builds the artifacts, verifies them, runs the full suite
+# against the commit the tag names, and only then publishes to PyPI through Trusted Publishing
+# (D-050). Nothing here defers to the CI workflow: a release gated on another workflow having
+# been green would publish whatever a skipped, stale or re-run job happened to leave behind.
+#
+# `workflow_dispatch` runs the build and every check and cannot reach `publish`, so the
+# artifacts can be rehearsed from any branch while a release stays impossible to start by hand.
+# Until a trusted publisher is configured for the `semdiff-html` project on PyPI, the publish
+# job fails at the upload step and nothing is released.
 on:
   push:
     tags: ["v*"]
   workflow_dispatch:
 
+# No job inherits a token it does not need: `contents: read` where a checkout happens, and
+# `id-token: write` only in `publish`, which is the one job that exchanges it with PyPI.
 permissions: {}
+
+# One release at a time, and never cancelled halfway: a version PyPI has begun to accept
+# cannot be uploaded a second time.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
+        with:
+          # This job reads the commit and never writes, so the token does not need to survive
+          # into `.git/config` where every later step could reach it.
+          persist-credentials: false
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -27,31 +46,113 @@ jobs:
         run: python -m twine check --strict dist/*
       - name: Verify the sdist contents (F-004, D-050)
         run: python scripts/check_sdist.py dist/*.tar.gz
-      - name: The tag must match the package version
-        if: startsWith(github.ref, 'refs/tags/')
+      - name: Install the wheel into a clean environment
         run: |
-          python -m pip install dist/*.whl
-          version=$(python -c "import semdiff; print(semdiff.__version__)")
-          tag="${GITHUB_REF_NAME#v}"
-          echo "tag $tag, package $version"
-          test "$tag" = "$version"
+          python -m venv "$RUNNER_TEMP/from-wheel"
+          "$RUNNER_TEMP/from-wheel/bin/python" -m pip install dist/*.whl
+          "$RUNNER_TEMP/from-wheel/bin/python" -m pip list
+      - name: The installed wheel behaves
+        run: |
+          "$RUNNER_TEMP/from-wheel/bin/python" scripts/smoke_install.py
+      - name: Install the sdist into a clean environment
+        # The sdist is what a platform without a matching wheel builds from. Its file list was
+        # checked (F-004); that it installs and runs was not, until here.
+        run: |
+          python -m venv "$RUNNER_TEMP/from-sdist"
+          "$RUNNER_TEMP/from-sdist/bin/python" -m pip install dist/*.tar.gz
+      - name: The installed sdist behaves
+        run: |
+          "$RUNNER_TEMP/from-sdist/bin/python" scripts/smoke_install.py
+      - name: The tag must match the installed semdiff-html version
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          # Through the environment, not interpolated into the script: `${{ }}` is substituted
+          # as text before the shell ever sees it, and a ref name is not this workflow's to
+          # trust even when only a writer can push one.
+          TAG: ${{ github.ref_name }}
+        run: |
+          version="${TAG#v}"
+          test -n "$version"
+          test "$TAG" != "$version"   # the prefix came off, so the tag was `v`-prefixed
+          echo "tag $TAG, version $version"
+          test -f "dist/semdiff_html-${version}.tar.gz"
+          test -f "dist/semdiff_html-${version}-py3-none-any.whl"
+          SEMDIFF_EXPECT_VERSION="$version" "$RUNNER_TEMP/from-wheel/bin/python" scripts/smoke_install.py
+          SEMDIFF_EXPECT_VERSION="$version" "$RUNNER_TEMP/from-sdist/bin/python" scripts/smoke_install.py
+      - name: Record the digests of what was verified
+        # Kept out of `dist/`, because the publish step uploads everything in that directory.
+        run: |
+          mkdir -p "$RUNNER_TEMP/digests"
+          cd dist && sha256sum ./* | tee "$RUNNER_TEMP/digests/SHA256SUMS"
       - uses: actions/upload-artifact@v4
         with:
           name: dist
           path: dist/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: digests
+          path: ${{ runner.temp }}/digests/SHA256SUMS
+
+  test:
+    # The gate. The full suite and the type checker, on the tag itself, across the matrix CI
+    # covers -- both selectolax lines, because they spell a foreign-content attribute key
+    # differently (F-027, D-046). `publish` needs this job, so a red cell stops the release
+    # instead of being discovered after the upload.
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+        selectolax: ["0.4.13", "1.0.0"]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install
+        run: python -m pip install -e ".[dev]"
+      - name: Pin the parser under test
+        run: python -m pip install "selectolax==${{ matrix.selectolax }}"
+      - name: Record the environment
+        run: |
+          python -c "import importlib.metadata as m; print('selectolax', m.version('selectolax'))"
+          python -c "import semdiff; print(semdiff.parser_fingerprint())"
+      - name: Tests (unit, corpus suite, four gates, parser contract)
+        run: python -m pytest -q
+      - name: Type check
+        run: python -m mypy --strict src/semdiff tests scripts
 
   publish:
-    needs: build
-    if: startsWith(github.ref, 'refs/tags/')
+    needs: [build, test]
+    # A pushed tag and nothing else. `workflow_dispatch` fails this condition, so the build and
+    # the checks can be rehearsed by hand while publishing stays reachable only from a tag.
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     environment: pypi
     permissions:
       # Trusted Publishing: PyPI verifies this workflow's OIDC token, so no API token is
-      # stored in the repository. The publisher has to be configured on PyPI first.
+      # stored in the repository. The publisher has to be configured for `semdiff-html` first.
       id-token: write
     steps:
       - uses: actions/download-artifact@v4
         with:
           name: dist
           path: dist/
-      - uses: pypa/gh-action-pypi-publish@release/v1
+      - uses: actions/download-artifact@v4
+        with:
+          name: digests
+          path: digests/
+      - name: Upload exactly what the build verified, and nothing else
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          ( cd dist && sha256sum -c ../digests/SHA256SUMS )
+          version="${TAG#v}"
+          test -f "dist/semdiff_html-${version}.tar.gz"
+          test -f "dist/semdiff_html-${version}-py3-none-any.whl"
+          test "$(ls dist | wc -l)" = "2"
+      - uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086  # v1.14.3

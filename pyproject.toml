@@ -7,7 +7,10 @@ requires = ["hatchling==1.32.4"]
 build-backend = "hatchling.build"
 
 [project]
-name = "semdiff"
+# The distribution name, not the import name. `semdiff` on PyPI is an unrelated project from
+# 2022 ("CLI client for the semdiff API"), so this ships as `semdiff-html` while `import
+# semdiff` and the `semdiff` command are untouched (D-050).
+name = "semdiff-html"
 # One source of truth: Hatchling reads the version out of `src/semdiff/__init__.py`, so the
 # number is never written twice (D-050, `[tool.hatch.version]` below).
 dynamic = ["version"]
@@ -65,7 +68,7 @@ semdiff = "semdiff.cli:main"
 [project.optional-dependencies]
 content = ["trafilatura"]
 ml = ["sentence-transformers"]
-all = ["semdiff[content,ml]"]
+all = ["semdiff-html[content,ml]"]
 # lxml is a development dependency, not a core one: nothing under src/semdiff imports it, and
 # tests/baseline measures SemDiff against lxml.html.diff for the published comparison (T-22).
 # It returns to the core install with the release that first imports it -- the second parser

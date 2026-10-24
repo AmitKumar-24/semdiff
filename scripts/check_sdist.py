@@ -9,7 +9,7 @@ this checks the artifact it actually produced.
 
 Usage::
 
-    python scripts/check_sdist.py dist/semdiff-*.tar.gz
+    python scripts/check_sdist.py dist/semdiff_html-*.tar.gz
 
 Exits 0 and prints what it found, or exits 1 naming every violation.
 """

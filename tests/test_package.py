@@ -29,11 +29,20 @@ SOURCE = ROOT / "src" / "semdiff"
 VERSION_FILE = SOURCE / "__init__.py"
 VERSION_LITERAL = re.compile(r'^__version__ = "([^"]+)"(?:\s*#.*)?$', re.MULTILINE)
 RELEASE_VERSION = re.compile(r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$")
+# The distribution and the import package are deliberately *not* the same name: `semdiff` on
+# PyPI is an unrelated 2022 project ("CLI client for the semdiff API"), which the release
+# preflight found by looking the name up, so the distribution is `semdiff-html` while the
+# import package, the console script and every module path stay `semdiff` (D-050). Anything
+# that reads installed metadata has to ask for the distribution; everything a user writes in
+# their code or types in a shell is still `semdiff`.
+DISTRIBUTION = "semdiff-html"
+IMPORT_PACKAGE = "semdiff"
+CONSOLE_SCRIPT = "semdiff"
 # The public extras surface, frozen by the first upload (Q-01, D-050). `all` is the union of
 # the feature extras and never carries `dev`.
 FEATURE_EXTRAS = frozenset({"content", "ml"})
 EXTRAS = FEATURE_EXTRAS | {"all", "dev"}
-SELF_REFERENCE = re.compile(r"^semdiff\[([^\]]+)\]$")
+SELF_REFERENCE = re.compile(rf"^{re.escape(DISTRIBUTION)}\[([^\]]+)\]$")
 
 # What a shipped layer imports: L0 parses with selectolax, every model is pydantic.
 IMPORTED = frozenset({"selectolax", "pydantic"})
@@ -84,7 +93,7 @@ def test_the_installed_distribution_reports_the_same_version() -> None:
     after bumping `__version__` this needs a reinstall — which is the point."""
     import semdiff
 
-    installed = importlib.metadata.version("semdiff")
+    installed = importlib.metadata.version(DISTRIBUTION)
     assert installed == semdiff.__version__, (
         f"installed metadata says {installed}, the package says {semdiff.__version__}. "
         'Reinstall (`pip install -e ".[dev]"`) if the version was just bumped; otherwise the '
@@ -187,9 +196,9 @@ def test_nothing_shipped_imports_lxml_so_the_core_install_may_omit_it() -> None:
 
 # ---- what a published release has to carry (NFR-9, D-050) ------------------------------------
 def test_the_extras_are_the_decided_public_surface() -> None:
-    """Q-01, resolved at D-050. An extra is a public name: `pip install semdiff[content]` in
-    someone's requirements file cannot be renamed later without breaking their install, so the
-    set is frozen by the first upload rather than discovered after it."""
+    """Q-01, resolved at D-050. An extra is a public name: `pip install semdiff-html[content]`
+    in someone's requirements file cannot be renamed later without breaking their install, so
+    the set is frozen by the first upload rather than discovered after it."""
     extras = _project()["optional-dependencies"]
     assert isinstance(extras, dict)
     assert set(extras) == EXTRAS, f"the published extras surface changed (Q-01, D-050): {set(extras)}"
@@ -209,6 +218,39 @@ def test_all_is_the_union_of_the_feature_extras_and_never_carries_dev() -> None:
         referenced |= {name.strip() for name in match.group(1).split(",")}
     assert referenced == FEATURE_EXTRAS, f"`all` resolves to {sorted(referenced)}"
     assert "dev" not in referenced
+
+
+def test_the_distribution_name_differs_from_the_import_name_on_purpose() -> None:
+    """D-050: `semdiff` was already taken on PyPI *and* TestPyPI by an unrelated project, so
+    the distribution is `semdiff-html`. Nothing a user writes changes: `import semdiff` and the
+    `semdiff` command are what the README documents, and renaming either would be a breaking
+    change to the public surface that the distribution name has no business causing."""
+    project = _project()
+    assert project["name"] == DISTRIBUTION
+    scripts = project["scripts"]
+    assert isinstance(scripts, dict)
+    assert scripts == {CONSOLE_SCRIPT: f"{IMPORT_PACKAGE}.cli:main"}, (
+        f"the console script moved: {scripts}. The distribution is {DISTRIBUTION}, the command "
+        f"is {CONSOLE_SCRIPT} (D-050)."
+    )
+    with PYPROJECT.open("rb") as handle:
+        wheel = tomllib.load(handle)["tool"]["hatch"]["build"]["targets"]["wheel"]
+    assert wheel["packages"] == [f"src/{IMPORT_PACKAGE}"]
+    assert VERSION_FILE == SOURCE / "__init__.py"
+
+
+def test_the_import_package_and_its_cli_entry_point_both_work() -> None:
+    """The other half: a rename that quietly broke the import or the entry point would pass
+    every metadata assertion above."""
+    import semdiff
+    from semdiff.cli import main
+
+    assert semdiff.__name__ == IMPORT_PACKAGE
+    assert callable(main)
+    assert semdiff.normalize("<p>x</p>") == "<html><head></head><body><p>x</p></body></html>"
+    entry_points = importlib.metadata.distribution(DISTRIBUTION).entry_points
+    console = {entry.name: entry.value for entry in entry_points if entry.group == "console_scripts"}
+    assert console == {CONSOLE_SCRIPT: f"{IMPORT_PACKAGE}.cli:main"}, console
 
 
 def test_the_published_metadata_is_complete() -> None:

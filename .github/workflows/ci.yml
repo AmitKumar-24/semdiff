@@ -59,17 +59,10 @@ jobs:
           /tmp/clean/bin/python -m pip install dist/*.whl
           /tmp/clean/bin/python -m pip list
       - name: Smoke-test the installed package
+        # The same script the release workflow runs, so the two cannot drift: distribution
+        # name, version agreement, py.typed, the API, the command, and no dev dependency.
         run: |
-          /tmp/clean/bin/semdiff --version
-          echo '<p>a</p>' | /tmp/clean/bin/semdiff normalize -
-          /tmp/clean/bin/python - <<'EOF'
-          import pathlib
-          import semdiff
-          assert (pathlib.Path(semdiff.__file__).parent / "py.typed").is_file(), "py.typed missing"
-          assert semdiff.__version__ != "0.0.0", "placeholder version shipped"
-          assert semdiff.normalize("<p>x</p>") == "<html><head></head><body><p>x</p></body></html>"
-          print("installed", semdiff.__version__, semdiff.parser_fingerprint())
-          EOF
+          /tmp/clean/bin/python scripts/smoke_install.py
       - name: The core closure resolves to wheels (NFR-9)
         run: |
           python -m pip install --only-binary :all: --dry-run dist/*.whl

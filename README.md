@@ -168,7 +168,19 @@ of them can invent a change — and each was accepted rather than engineered aro
 ## Install
 
 ```
-pip install semdiff
+pip install semdiff-html
+```
+
+The distribution is `semdiff-html`, because `semdiff` on PyPI is an unrelated project. What
+you write is unaffected — the import package and the command are both `semdiff`:
+
+```python
+import semdiff
+semdiff.normalize(html)
+```
+
+```
+semdiff normalize page.html
 ```
 
 To work on it instead:
@@ -179,10 +191,10 @@ pip install -e ".[dev]"
 
 Requires Python 3.11+. Runtime dependencies: `selectolax`, `pydantic`. `lxml` is needed
 only by the baseline comparison in the test suite, so it lives in `[dev]`.
-Two further extras are declared for layers that are not built yet — `[content]`
-(trafilatura scoping) and `[ml]`, with `[all]` their union — so installing one today adds a
-dependency and no capability. The names are fixed now because a requirements file cannot be
-renamed retroactively (D-050).
+Two further extras are declared for layers that are not built yet — `semdiff-html[content]`
+(trafilatura scoping) and `semdiff-html[ml]`, with `[all]` their union — so installing one
+today adds a dependency and no capability. The names are fixed now because a requirements
+file cannot be renamed retroactively (D-050).
 Both selectolax lines are supported and tested: CI runs 0.4.13 and 1.0.0 against every
 Python version, plus a weekly job on whatever is newest.
 
