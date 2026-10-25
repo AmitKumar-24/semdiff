@@ -23,8 +23,12 @@ semdiff.normalize(old_html) == semdiff.normalize(new_html)   # True if nothing r
 
 ```python
 semdiff.normalize('<div class="card css-1dbjc4n"><!-- r4 --><p>Updated 3 minutes ago</p></div>')
-# '<html><head></head><body><div class="card"><p>Updated</p></div></body></html>'
+# '<html><head></head><body><div class="card __semdiff__"><p>Updated</p></div></body></html>'
 ```
+
+A hash is replaced, not deleted: `css-1dbjc4n` becomes `__semdiff__`. Both snapshots collapse
+the same way, so the placeholder cannot invent a change, and keeping a stable prefix is what
+still tells `tab-__semdiff__` from `panel-__semdiff__` (F-029).
 
 ```python
 semdiff.normalize(html, config=None, *, encoding=None) -> str
@@ -72,7 +76,7 @@ semdiff normalize page.html --config semdiff.json
 
 ```
 $ semdiff normalize page.html --report > clean.html
-parser selectolax/1.0.0
+parser selectolax/1.0.2
 6 rules fired, 10 applications
   class.emotion           1
   id.hex_suffix           1
@@ -90,8 +94,9 @@ Exit codes: `0` success, `2` bad command line, `3` parse error, `4` input too la
 - **Deterministic.** Same input, same config and same parser build, same output — no clock,
   no network, no randomness. `Config.config_hash` covers the config and the ruleset version;
   the parser is the one input it does not cover, so `semdiff.parser_fingerprint()` names it
-  (`selectolax/1.0.0`) and `--report` prints it. Normalized output is identical across the
-  selectolax versions CI covers; a `Locator.node_hash` on foreign content is not (F-027).
+  (`selectolax/1.0.2`, for example) and `--report` prints it. Normalized output is identical
+  across the selectolax versions CI covers; a `Locator.node_hash` on foreign content is not
+  (F-027).
 - **Idempotent.** `normalize(normalize(x)) == normalize(x)`.
 - **Safe.** Input is untrusted: parse-only, no script execution, no external entity
   resolution, no outbound requests.
